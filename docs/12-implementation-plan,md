@@ -1,0 +1,3735 @@
+Below is the **100-sub-issue implementation backlog for MarkHere**, derived directly from the 11 architecture documents. The sequence is dependency-aware: an issue should not bypass architectural work assigned to an earlier issue merely because a later feature can be made to “work” faster.
+
+I also re-verified the architecture against current upstream guidance. Electron still recommends renderer sandboxing, context isolation, sender validation, restrictive navigation/CSP, careful `shell.openExternal` handling, and custom protocols instead of unrestricted `file://`. ([Electron][1]) CodeMirror 6 continues to use immutable state plus transactions, which fits MarkHere’s canonical revision model. ([CodeMirror][2]) CommonMark 0.31.2 remains the current published CommonMark specification. ([CommonMark Spec][3])
+
+---
+
+# Issue 1 - Establish the MarkHere Repository, Toolchain, Architecture Boundaries, and Provenance
+
+This issue creates the foundation on which every other MarkHere feature is built. No editor work, filesystem access, export functionality, or UI feature should be started until the repository has explicit package boundaries and development rules.
+
+MarkHere is **not** a renamed MarkText fork. According to ADR-002, it is a distinct application that may selectively reuse/adapt suitable MarkText code. The monorepo must therefore make it obvious which code belongs to MarkHere, which packages are process-neutral, and which files contain inherited or adapted MarkText/Muya material.
+
+The architecture defined by `01-system-overview.md`, `09-deployment-strategy.md`, `10-testing-strategy.md`, and ADR-001 through ADR-005 must be established here.
+
+The expected conceptual structure is:
+
+```text
+markhere/
+├─ apps/
+│  └─ desktop/
+├─ packages/
+│  ├─ document-model/
+│  ├─ markdown-engine/
+│  ├─ wysiwyg-editor/
+│  ├─ source-editor/
+│  ├─ export-core/
+│  ├─ ipc-contract/
+│  ├─ shared/
+│  └─ test-fixtures/
+├─ build/
+├─ docs/
+├─ scripts/
+├─ tests/
+└─ package.json
+```
+
+Completion of Issue 1 means a developer can clone the repository, run one documented install command, run lint/typecheck/tests, start a minimal secure Electron window, and produce a development build without any hidden local-machine configuration.
+
+## Issue 1.1 - Create the pnpm TypeScript Monorepo
+
+Create the repository root and establish the pnpm workspace described by ADR-004.
+
+Implementation tasks:
+
+* Create the root `package.json`.
+* Declare `packageManager` with an exact reviewed pnpm major/minor range.
+* Add `pnpm-workspace.yaml`.
+* Create `apps/desktop`.
+* Create all process-neutral packages defined by the system overview.
+* Give internal packages explicit names such as `@markhere/document-model`.
+* Mark application-only packages private.
+* Configure workspace dependencies using `workspace:*`.
+* Do not introduce Lerna, Nx, Turborepo, or another orchestration framework unless a future ADR authorizes it.
+* Add `.gitignore`, `.editorconfig`, `.npmrc`, and a root README.
+* Do not place shared business logic directly in `apps/desktop`.
+
+Package dependencies must follow the architectural dependency direction:
+
+```text
+desktop
+  ↓
+ipc-contract
+  ↓
+application services
+  ↓
+document-model / markdown-engine / export-core
+```
+
+Electron-specific modules must never become dependencies of `document-model`, Markdown parsing, export IR, or other process-neutral packages.
+
+**Acceptance criteria**
+
+* `pnpm install` succeeds from a clean checkout.
+* `pnpm -r list` shows the expected packages.
+* Each package can be typechecked independently.
+* No circular workspace dependency exists.
+* A dependency diagram can be generated without unexpected Electron dependencies in process-neutral packages.
+
+**Traceability:** ADR-004, ADR-045, NFR-MNT-001.
+
+---
+
+## Issue 1.2 - Pin and Document the Development Toolchain
+
+Establish exact supported versions rather than allowing developers to install arbitrary current versions.
+
+The architecture currently targets:
+
+```text
+Electron 42.x baseline
+TypeScript 6.x baseline
+Vue 3.x
+pnpm 10.x
+Windows 11 x64
+```
+
+The precise Node.js version must be compatible with the selected Electron/build tooling and must be pinned in `.nvmrc`, `.node-version`, Volta configuration, or an equivalent repository-controlled mechanism.
+
+Implementation tasks:
+
+* Add Node engine requirements.
+* Pin pnpm.
+* Pin Electron.
+* Pin TypeScript.
+* Pin Vue 3.
+* Pin Vite/electron-vite if chosen.
+* Add CodeMirror 6 packages explicitly rather than a hidden transitive dependency.
+* Generate and commit `pnpm-lock.yaml`.
+* Require CI to use `pnpm install --frozen-lockfile`.
+* Document upgrade procedure.
+* Add an architectural rule that major-version dependency upgrades require explicit review.
+
+Do not automatically track `latest` versions during builds.
+
+**Acceptance criteria**
+
+Running:
+
+```bash
+node --version
+pnpm --version
+pnpm install --frozen-lockfile
+```
+
+on a supported development machine produces the expected environment and deterministic dependency graph.
+
+**Traceability:** Deployment Strategy §3, ADR-001, ADR-004.
+
+---
+
+## Issue 1.3 - Establish MarkText/Muya License and Provenance Tracking
+
+Create the legal/provenance mechanism before copying a single substantial MarkText file.
+
+For every reused or substantially adapted upstream file, record:
+
+* original repository;
+* original path;
+* upstream commit/tag;
+* original copyright;
+* MIT license applicability;
+* whether the file is copied, adapted, or conceptually reimplemented;
+* MarkHere path.
+
+Create something equivalent to:
+
+```text
+docs/provenance/
+├─ MARKTEXT_PROVENANCE.md
+├─ MUYA_PROVENANCE.md
+└─ THIRD_PARTY_CODE_POLICY.md
+```
+
+Where practical, add a header to adapted source files:
+
+```ts
+/**
+ * Derived in part from MarkText/Muya.
+ * Original project: https://github.com/marktext/marktext
+ * Upstream revision: <commit>
+ * See THIRD_PARTY_NOTICES.md.
+ */
+```
+
+Do not replace upstream copyright with MarkHere copyright.
+
+Do not label independently written MarkHere code as MarkText-derived simply because the behavior is similar.
+
+**Acceptance criteria**
+
+* Every reused source file has traceable provenance.
+* MIT notice is distributed with reused substantial portions.
+* CI can identify files designated as upstream-derived.
+* `THIRD_PARTY_NOTICES.md` exists.
+
+**Traceability:** ADR-002, ADR-003, NFR-MNT-003.
+
+---
+
+## Issue 1.4 - Configure TypeScript Project Boundaries
+
+Create strict TypeScript configurations for each architectural layer.
+
+Create root/base configuration and specialized configs for:
+
+```text
+main
+preload
+renderer
+workers
+shared libraries
+tests
+```
+
+Enable appropriate strictness:
+
+```json
+{
+  "strict": true,
+  "noImplicitOverride": true,
+  "noUncheckedIndexedAccess": true,
+  "exactOptionalPropertyTypes": true
+}
+```
+
+Where existing reused MarkText/Muya code prevents immediate strict-mode adoption, isolate temporary exceptions in that package rather than weakening the whole repository.
+
+Define aliases such as:
+
+```text
+@markhere/document-model
+@markhere/ipc-contract
+@markhere/shared
+```
+
+Avoid renderer imports that accidentally reach `electron`, `fs`, `child_process`, or main-process modules.
+
+**Acceptance criteria**
+
+* `pnpm typecheck` checks every package.
+* Main-only modules cannot accidentally compile inside renderer packages.
+* Shared DTO types compile without Node/Electron runtime dependencies.
+* CI rejects type errors.
+
+**Traceability:** ADR-004, NFR-MNT-001, NFR-MNT-002.
+
+---
+
+## Issue 1.5 - Configure Formatting, Linting, and Architectural Dependency Rules
+
+Add ESLint and Prettier before feature development.
+
+In addition to ordinary lint rules, implement rules that enforce architectural constraints.
+
+Examples:
+
+* renderer cannot import `electron`;
+* renderer cannot import `node:fs`;
+* renderer cannot import `node:path`;
+* document-model cannot import Vue;
+* export-core cannot import UI components;
+* preload cannot contain arbitrary application business logic;
+* internal IPC channel names cannot be imported into renderer UI code.
+
+Create scripts:
+
+```text
+pnpm lint
+pnpm lint:fix
+pnpm format
+pnpm format:check
+```
+
+If necessary, write a lightweight architecture test that scans imports.
+
+**Acceptance criteria**
+
+A deliberately invalid renderer import such as:
+
+```ts
+import fs from 'node:fs'
+```
+
+must fail CI.
+
+**Traceability:** ADR-010, ADR-011, NFR-MNT-001.
+
+---
+
+## Issue 1.6 - Create the Desktop Application Build Skeleton
+
+Create `apps/desktop` with separate entrypoints for:
+
+```text
+main
+preload
+renderer
+worker
+```
+
+Do not begin with a large application component.
+
+The first executable should do only enough to demonstrate:
+
+```text
+Electron Main
+      ↓
+BrowserWindow
+      ↓
+Preload
+      ↓
+Vue renderer
+```
+
+Create explicit directories such as:
+
+```text
+apps/desktop/src/
+├─ main/
+├─ preload/
+├─ renderer/
+└─ workers/
+```
+
+The renderer should initially display:
+
+```text
+MarkHere
+Development Build
+```
+
+Do not enable filesystem access or raw IPC just to make development easier.
+
+**Acceptance criteria**
+
+* `pnpm dev` opens MarkHere.
+* DevTools works in development.
+* renderer has no Node global access.
+* production renderer can be built separately.
+* console shows no Electron security warning caused by MarkHere configuration.
+
+**Traceability:** System Overview §7, ADR-001, ADR-011.
+
+---
+
+## Issue 1.7 - Create Shared Domain and Contract Packages
+
+Create placeholder packages for the future architectural contracts so developers do not invent ad hoc DTOs inside components.
+
+At minimum:
+
+```text
+packages/document-model
+packages/ipc-contract
+packages/markdown-engine
+packages/export-core
+packages/shared
+```
+
+Each should expose only a deliberate public `index.ts`.
+
+The initial `document-model` package should define branded identifier types:
+
+```ts
+type DocumentId = string
+type WorkspaceId = string
+type ExportJobId = string
+type CapabilityId = string
+type DocumentRevision = number
+```
+
+Do not yet implement business behavior beyond types and simple utilities.
+
+**Acceptance criteria**
+
+* renderer and main import DTOs from the same contract package;
+* no duplicated `Document` interfaces exist;
+* domain package tests run independently.
+
+**Traceability:** Data Model, API Design §19, ADR-008, ADR-045.
+
+---
+
+## Issue 1.8 - Define MarkHere Product Identity
+
+Establish identity before persistent settings or Windows integration are implemented.
+
+Define:
+
+```text
+Product name: MarkHere
+Executable: markhere.exe
+App data folder: MarkHere
+Protocol namespace: markhere://
+Resource protocol: markhere-resource://
+Internal IPC prefix: mh:v1:
+```
+
+Choose a provisional application ID such as:
+
+```text
+com.markhere.desktop
+```
+
+but clearly document that the final publisher namespace must be frozen before stable release.
+
+Replace inherited MarkText icons only after verifying that no legal/provenance file is inadvertently removed.
+
+Create placeholder icons in all required formats without copying trademarked branding unnecessarily.
+
+**Acceptance criteria**
+
+No newly generated MarkHere runtime data is written to a `MarkText` application directory.
+
+**Traceability:** Deployment Strategy §§7-8, ADR-002.
+
+---
+
+## Issue 1.9 - Add Third-Party Notice and SBOM Generation
+
+Automate dependency/license inventory early.
+
+Create scripts that:
+
+* enumerate production dependencies;
+* record package name/version/license;
+* flag unknown/disallowed licenses;
+* generate `THIRD_PARTY_NOTICES.md`;
+* produce CycloneDX or SPDX SBOM;
+* explicitly include MarkText/Muya provenance.
+
+Generated release output should eventually contain:
+
+```text
+THIRD_PARTY_NOTICES.md
+LICENSE
+sbom.json
+```
+
+Fail CI if a dependency has an unreviewed license.
+
+Do not assume that an npm package being downloadable means it is acceptable for redistribution.
+
+**Acceptance criteria**
+
+`pnpm licenses` generates deterministic notices from the lockfile.
+
+**Traceability:** ADR-003, ADR-029, Testing Strategy §42-43.
+
+---
+
+## Issue 1.10 - Establish the Foundation CI Gate
+
+Create the first mandatory CI workflow.
+
+Every pull request must run:
+
+```text
+install
+format check
+lint
+typecheck
+unit tests
+license validation
+architecture import checks
+development build
+```
+
+Cache pnpm safely but never bypass the frozen lockfile.
+
+Upload test/build logs when failure occurs.
+
+Do not publish releases from this workflow.
+
+Add branch protection expectations to project documentation.
+
+Issue 1 is complete only when a brand-new contributor can clone the repository, follow the README, and obtain the same successful build as CI.
+
+**Acceptance criteria**
+
+A PR containing any of the following fails:
+
+* type error;
+* lint violation;
+* unknown dependency license;
+* forbidden renderer Node import;
+* failing unit test;
+* lockfile mismatch.
+
+**Traceability:** Testing Strategy §45, ADR-041, ADR-043.
+
+---
+
+# Issue 2 - Build the Secure Electron Application Shell and Privileged API Boundary
+
+Issue 2 establishes MarkHere's security boundary.
+
+The renderer must be treated as potentially compromised because it renders user-controlled Markdown. Electron's current security guidance specifically recommends context isolation, sandboxing, sender validation, limiting navigation, carefully handling external URLs, and avoiding broad `file://` authority. ([Electron][1])
+
+The architecture must expose **semantic capabilities**, never raw IPC:
+
+```ts
+window.markhere.files.saveDocument(...)
+```
+
+not:
+
+```ts
+window.electron.ipcRenderer.invoke(...)
+```
+
+Electron's context-isolation documentation explicitly warns against exposing a general `ipcRenderer.send` bridge. ([Electron][4])
+
+## Issue 2.1 - Implement Application Lifecycle and Single-Instance Coordination
+
+Create `AppLifecycle`.
+
+Responsibilities:
+
+* register custom schemes before `app.ready`;
+* acquire single-instance lock;
+* parse startup arguments;
+* distinguish files, folders, and CLI options;
+* queue open requests until renderer readiness;
+* forward second-instance activation to the running process;
+* restore/focus an appropriate window;
+* handle normal quit;
+* handle Windows file activation;
+* avoid losing unsaved work during shutdown.
+
+Startup arguments are data. Never reconstruct them into a shell command.
+
+Implement:
+
+```ts
+app.requestSingleInstanceLock()
+app.on('second-instance', ...)
+```
+
+Paths received through Windows activation must pass the normal FileService validation pipeline later.
+
+**Acceptance criteria**
+
+Opening two Markdown files by double-clicking them sequentially does not create uncontrolled duplicate app instances.
+
+**Traceability:** FR-APP-001, FR-APP-002, ADR-001.
+
+---
+
+## Issue 2.2 - Implement Hardened BrowserWindow Creation
+
+Create one centralized `WindowManager.createEditorWindow()`.
+
+Explicitly set:
+
+```ts
+webPreferences: {
+  nodeIntegration: false,
+  contextIsolation: true,
+  sandbox: true,
+  preload: ...
+}
+```
+
+Do not depend only on Electron defaults.
+
+Also:
+
+* deny arbitrary popup creation;
+* limit navigation;
+* prevent renderer-controlled preload paths;
+* disable unnecessary experimental features;
+* make DevTools environment-dependent;
+* clamp restored window bounds to visible displays.
+
+No other code may instantiate editor `BrowserWindow` directly.
+
+**Acceptance criteria**
+
+An automated security test inspects every MarkHere BrowserWindow and confirms required settings.
+
+**Traceability:** NFR-SEC-001, ADR-011, Security Design §§7-9.
+
+---
+
+## Issue 2.3 - Implement `markhere://` Application Protocol
+
+Use a custom secure scheme for packaged renderer content instead of making `file://` the application origin.
+
+Register the scheme before application readiness.
+
+Create controlled routing:
+
+```text
+markhere://app/index.html
+markhere://app/assets/...
+```
+
+Do not set `bypassCSP` merely for convenience. Electron supports registering custom schemes with explicit privileges; MarkHere should enable only required privileges. ([Electron][5])
+
+Validate:
+
+* host;
+* decoded path;
+* requested resource;
+* MIME type.
+
+Directory traversal such as:
+
+```text
+markhere://app/../../secret
+```
+
+must fail.
+
+**Acceptance criteria**
+
+The production application runs entirely from `markhere://app` and maintains its CSP.
+
+**Traceability:** ADR-012, NFR-SEC-004.
+
+---
+
+## Issue 2.4 - Implement the Capability-Oriented Preload Bridge
+
+Expose:
+
+```ts
+window.markhere
+```
+
+with the API defined by `05-api-design.md`.
+
+Initial namespaces:
+
+```text
+app
+window
+dialogs
+files
+workspaces
+resources
+settings
+recovery
+exports
+shell
+clipboard
+updates
+events
+```
+
+The preload may internally call IPC, but the renderer must not see:
+
+* `ipcRenderer`;
+* Electron events;
+* `fs`;
+* environment variables;
+* `shell`;
+* BrowserWindow;
+* WebContents;
+* arbitrary channel names.
+
+Callbacks must strip the `IpcRendererEvent` argument.
+
+**Acceptance criteria**
+
+`Object.keys(window.markhere)` matches the reviewed bridge API, and no generic `send`, `invoke`, or raw Electron object is reachable.
+
+**Traceability:** ADR-010, NFR-SEC-002, API Design §§2-3.
+
+---
+
+## Issue 2.5 - Implement the Typed IPC Contract and Runtime Schemas
+
+Build `packages/ipc-contract`.
+
+Define:
+
+```text
+bridge.ts
+dto/
+schemas/
+internal-channels.ts
+```
+
+Every privileged method must have:
+
+1. TypeScript request interface;
+2. TypeScript response interface;
+3. runtime schema;
+4. internal channel constant;
+5. main handler;
+6. preload wrapper.
+
+Use a runtime validator such as Zod.
+
+Example:
+
+```text
+mh:v1:file:save
+mh:v1:export:start
+mh:v1:settings:get
+```
+
+Do not use unrestricted `unknown` long-term for security-sensitive requests.
+
+**Acceptance criteria**
+
+Malformed payloads are rejected before reaching services.
+
+**Traceability:** NFR-MNT-002, NFR-SEC-003, ADR-010.
+
+---
+
+## Issue 2.6 - Implement Sender Validation and Capability Ownership
+
+Create `TrustedWebContentsRegistry`.
+
+Track:
+
+```ts
+interface TrustedWebContentsRecord {
+  webContentsId: number
+  kind: 'editor' | 'settings'
+  windowId: string
+  origin: string
+}
+```
+
+Every privileged IPC handler must confirm:
+
+* sender WebContents is registered;
+* sender URL has expected MarkHere origin;
+* correct top-level frame sent the request;
+* sender still exists;
+* document/workspace capability belongs to sender's session.
+
+A valid TypeScript DTO from an untrusted sender must still be rejected.
+
+**Acceptance criteria**
+
+A test-created unregistered WebContents cannot save a document even with a syntactically perfect save request.
+
+**Traceability:** ADR-010, NFR-SEC-003, Security Design §21.
+
+---
+
+## Issue 2.7 - Implement Window Management and Multi-Window Isolation
+
+Implement:
+
+* create editor window;
+* create settings window;
+* focus existing window;
+* minimize;
+* maximize;
+* fullscreen;
+* always-on-top;
+* close request;
+* save/discard/cancel flow.
+
+Main derives the target window from the sender. Renderer must not send arbitrary numeric window IDs for privileged actions.
+
+Each editor window receives independent:
+
+* tab collection;
+* active document;
+* workspace;
+* UI layout.
+
+Do not yet implement shared live buffers between windows.
+
+**Acceptance criteria**
+
+Closing one editor window cannot close or mutate tabs owned by another.
+
+**Traceability:** FR-APP-003, ADR-045.
+
+---
+
+## Issue 2.8 - Implement Safe Dialog and Shell Services
+
+Implement OS dialogs behind capabilities.
+
+Dialogs:
+
+```text
+openDocuments
+openWorkspace
+chooseSaveDocument
+chooseExportTarget
+confirm
+```
+
+Return short-lived selection tokens rather than treating returned renderer strings as future unrestricted filesystem authority.
+
+Implement central `ShellService`.
+
+Initially permit external:
+
+```text
+https:
+mailto:
+```
+
+Reject:
+
+```text
+javascript:
+data:
+file:
+vbscript:
+shell:
+```
+
+Do not pass an unvalidated Markdown link directly to `shell.openExternal`; Electron explicitly warns about doing this with untrusted content. ([Electron][1])
+
+**Acceptance criteria**
+
+`javascript:alert(1)` supplied through Markdown cannot reach the OS shell.
+
+**Traceability:** ADR-020, ADR-046, FR-PREV-008.
+
+---
+
+## Issue 2.9 - Implement Application Commands and Native Menu Routing
+
+Create an application command registry separate from menu UI.
+
+Commands should include stable IDs such as:
+
+```text
+file.new
+file.open
+file.save
+file.saveAs
+file.exportPdf
+file.exportDocx
+view.preview
+view.wysiwyg
+view.source
+view.split
+app.settings
+app.quit
+```
+
+Native menu items dispatch command IDs to the active trusted window.
+
+Renderer toolbar and command palette should call the same command abstraction rather than duplicate business logic.
+
+Define enable/disable conditions based on active document state.
+
+**Acceptance criteria**
+
+Ctrl+S, menu Save, and future toolbar Save all invoke the same logical save command.
+
+**Traceability:** Data Model §23, API Design §27.
+
+---
+
+## Issue 2.10 - Establish the Secure Shell Verification Gate
+
+Before filesystem/editing work begins, create integration tests proving:
+
+* sandbox enabled;
+* context isolation enabled;
+* Node integration disabled;
+* custom app protocol used;
+* generic IPC inaccessible;
+* arbitrary navigation blocked;
+* popup creation blocked;
+* external scheme validation enforced;
+* trusted sender validation active;
+* main remains functional after malformed renderer IPC.
+
+Document the security baseline.
+
+Issue 2 is not complete merely because a window appears.
+
+**Acceptance criteria**
+
+All shell/security tests run in CI and are classified as release-blocking.
+
+**Traceability:** Security Design §36, ADR-043.
+
+---
+
+# Issue 3 - Implement the Canonical Document Model, Filesystem Lifecycle, Atomic Persistence, Conflicts, and Recovery
+
+This issue implements the central invariant of MarkHere:
+
+> The canonical open-session representation is versioned Markdown text.
+
+The WYSIWYG DOM, preview DOM, syntax tree, HTML, PDF, DOCX, and CodeMirror state are derived/adapted representations. None may independently become the authoritative saved document.
+
+## Issue 3.1 - Implement `DocumentSession` and `DocumentBuffer`
+
+Implement the exact model defined in `04-data-model.md`.
+
+Core entities include:
+
+```ts
+DocumentSession
+DocumentBuffer
+FileBinding
+TextFormatMetadata
+FileFingerprint
+MutationMetadata
+DocumentViewState
+RecoveryState
+DocumentConflict
+```
+
+Enforce:
+
+```ts
+dirty === revision !== persistedRevision
+```
+
+Do not expose public setters that allow arbitrary mutation.
+
+Every content-changing operation must create mutation metadata containing:
+
+```text
+source
+transactionId
+baseRevision
+resultingRevision
+timestamp
+```
+
+Never put Markdown content into mutation logs.
+
+**Acceptance criteria**
+
+Unit tests prove revision/dirty invariants for create, edit, save, reload, recovery, and mode transitions.
+
+**Traceability:** ADR-008, ADR-045, FR-SAVE-004.
+
+---
+
+## Issue 3.2 - Implement Document Open and Text Decoding
+
+Create `FileService.openDocument`.
+
+Algorithm:
+
+1. resolve authorized selection/capability;
+2. normalize path;
+3. stat file;
+4. asynchronously read bytes;
+5. inspect BOM;
+6. attempt strict UTF-8;
+7. run approved encoding detector when necessary;
+8. decode;
+9. detect line endings;
+10. detect final newline;
+11. calculate fingerprint;
+12. create main-owned capability;
+13. return `OpenDocumentDTO`.
+
+Zero-byte files are valid.
+
+Handle:
+
+* Unicode filenames;
+* spaces;
+* `#`;
+* `%`;
+* `?`;
+* ampersands;
+* parentheses;
+* Windows long paths.
+
+**Acceptance criteria**
+
+Encoding/path fixture suite passes without mojibake or URL/path confusion.
+
+**Traceability:** FR-FILE-008 through FR-FILE-010, FR-SAVE-005 through FR-SAVE-007.
+
+---
+
+## Issue 3.3 - Implement File Capabilities and Path Identity
+
+Create a `FileCapabilityRegistry`.
+
+A renderer-visible `displayPath` is informational; it must not authorize write access.
+
+A capability record should associate:
+
+```text
+capability ID
+trusted absolute/canonical path
+owner window/session
+permissions
+created time
+document ID
+```
+
+Implement path identity logic handling:
+
+* Windows drive-letter casing;
+* separators;
+* UNC paths;
+* normalized paths;
+* case preservation;
+* symlinks/realpaths where appropriate.
+
+Never use `pathA.toLowerCase() === pathB.toLowerCase()` as the sole identity mechanism.
+
+**Acceptance criteria**
+
+Changing `displayPath` in renderer memory cannot redirect a save to another location.
+
+**Traceability:** Data Model §§2.4, 5, 15; ADR-014.
+
+---
+
+## Issue 3.4 - Implement Canonical Revision Mutation Semantics
+
+Create a single mutation interface such as:
+
+```ts
+commitDocumentMutation({
+  documentId,
+  baseRevision,
+  source,
+  markdown,
+  summary
+})
+```
+
+Reject or correctly reconcile stale base revisions.
+
+A valid edit:
+
+```text
+revision 8
+↓ source edit
+revision 9
+persistedRevision 8
+dirty true
+```
+
+A reload operation may create another revision but must explicitly identify its source as `reload`.
+
+Avoid using Vue component watchers as the source of truth for dirty state.
+
+**Acceptance criteria**
+
+Rapid mutations produce deterministic monotonically increasing revisions.
+
+**Traceability:** ADR-008, ADR-038.
+
+---
+
+## Issue 3.5 - Implement Serialized Atomic Save
+
+Implement one save queue per document.
+
+A save request captures:
+
+```text
+document ID
+revision
+Markdown snapshot
+expected disk fingerprint
+text format
+```
+
+Before write:
+
+* verify capability;
+* verify ownership;
+* check current disk fingerprint;
+* encode expected format;
+* create same-directory temporary file where feasible;
+* fully write and close;
+* replace target atomically;
+* compute resulting fingerprint;
+* clean temporary resources.
+
+Most importantly:
+
+If revision 42 is saved while the live buffer has reached 43:
+
+```text
+persistedRevision = 42
+revision = 43
+dirty = true
+```
+
+Do **not** mark the tab clean.
+
+**Acceptance criteria**
+
+Fault injection never leaves a half-written final Markdown file.
+
+**Traceability:** FR-SAVE-001, FR-SAVE-003, NFR-REL-001, NFR-REL-002, ADR-014.
+
+---
+
+## Issue 3.6 - Implement Save As Without Premature Identity Mutation
+
+Save As has stricter state rules.
+
+Sequence:
+
+1. obtain export/save selection token;
+2. snapshot current revision;
+3. write target safely;
+4. verify final target;
+5. create new FileBinding;
+6. only then update document identity;
+7. replace watcher/resource scope;
+8. update recent documents.
+
+If Save As fails, the original document binding remains unchanged.
+
+Do not set the new filename in state before disk success merely because the user selected it.
+
+**Acceptance criteria**
+
+Simulated permission failure during Save As leaves the original document path/capability intact.
+
+**Traceability:** FR-SAVE-002.
+
+---
+
+## Issue 3.7 - Implement File Fingerprints, Watchers, and Self-Write Suppression
+
+Implement `WatchService`.
+
+Use fast fingerprints:
+
+```text
+size + mtime
+```
+
+for normal event filtering.
+
+Use SHA-256 when ambiguity or conflict exists.
+
+Normalize noisy watcher events into semantic events:
+
+```text
+changed
+deleted
+renamed/moved candidate
+```
+
+Suppress MarkHere's own save events using:
+
+* expected fingerprint;
+* save job token;
+* short bounded self-write correlation state.
+
+Do not simply ignore every filesystem event occurring shortly after a save.
+
+**Acceptance criteria**
+
+Saving in MarkHere does not produce a false “file changed externally” warning.
+
+**Traceability:** Storage Strategy §§10-13, ADR-015.
+
+---
+
+## Issue 3.8 - Implement the External-Change Conflict State Machine
+
+Required behavior:
+
+### Clean document + external change
+
+Reload automatically or according to documented preference, without destroying local edits because none exist.
+
+### Dirty document + external change
+
+Enter explicit conflict state.
+
+Provide options:
+
+```text
+Compare/inspect
+Reload disk version
+Keep local version
+Save As
+Overwrite only after explicit decision
+```
+
+Store both disk and local fingerprints/revisions where necessary.
+
+Never silently overwrite known external modifications.
+
+Handle external deletion separately.
+
+**Acceptance criteria**
+
+An external edit during a dirty session cannot be overwritten by an ordinary automatic save.
+
+**Traceability:** NFR-REL-003, ADR-015, Requirements Scenario D.
+
+---
+
+## Issue 3.9 - Implement Recovery Snapshots
+
+Recovery is **not Save**.
+
+Create `RecoveryService` that periodically receives dirty document snapshots.
+
+Store:
+
+```text
+schema version
+snapshot ID
+document ID
+display identity
+source revision
+persisted revision
+timestamp
+fingerprint
+Markdown
+text-format metadata
+```
+
+Write recovery snapshots atomically to MarkHere's private session storage.
+
+On next abnormal startup:
+
+* list summaries;
+* do not immediately load all Markdown into UI;
+* allow inspect;
+* restore;
+* Save As;
+* discard.
+
+Delete obsolete snapshots after successful clean save/close according to retention rules.
+
+**Acceptance criteria**
+
+Killing the renderer/process after editing leaves a recoverable snapshot without modifying the user's original Markdown.
+
+**Traceability:** FR-REC-001 through FR-REC-005, ADR-016.
+
+---
+
+## Issue 3.10 - Implement Session Persistence and Schema Migration
+
+Persist non-document state separately:
+
+```text
+windows.json
+session layout
+active tabs
+recent metadata
+```
+
+Never treat this state as authoritative document content.
+
+All persisted structures require:
+
+```text
+schemaVersion
+migration path
+validation
+safe fallback
+```
+
+If migration fails:
+
+* preserve the old file for diagnosis;
+* start with safe defaults;
+* do not delete user Markdown.
+
+Persist window coordinates but clamp them against connected displays on next startup.
+
+**Acceptance criteria**
+
+An intentionally old test schema migrates correctly and an invalid schema fails safely.
+
+**Traceability:** ADR-034, ADR-037, FR-SET-001, FR-APP-004.
+
+---
+
+# Issue 4 - Implement the Markdown Dialect, Parsing, Safe Rendering, Resource Broker, and Preview Pipeline
+
+MarkHere must explicitly support:
+
+```text
+CommonMark 0.31.2
++ GitHub Flavored Markdown
++ registered MarkHere extensions
+```
+
+It must never claim “all Markdown” compatibility.
+
+CommonMark 0.31.2 remains the published reference baseline and therefore remains consistent with the architecture documents. ([CommonMark Spec][3])
+
+## Issue 4.1 - Implement the Markdown Capability Registry
+
+Create a centralized profile:
+
+```ts
+interface MarkdownCapabilityProfile {
+  commonMark: '0.31.2'
+  gfmTables: boolean
+  gfmTaskLists: boolean
+  gfmStrikethrough: boolean
+  extendedAutolinks: boolean
+  frontMatter: boolean
+  math: boolean
+  mermaid: boolean
+  rawHtml: 'sanitized'
+}
+```
+
+Renderer, WYSIWYG adapter, preview, and exporters must use the same profile.
+
+Do not allow independent feature flags inside each renderer implementation.
+
+Create documentation stating Level A/B/C compatibility rules from `02-requirements-and-scope.md`.
+
+**Acceptance criteria**
+
+One profile determines which features are considered supported throughout MarkHere.
+
+**Traceability:** ADR-017, ADR-050, FR-MD-001 through FR-MD-008.
+
+---
+
+## Issue 4.2 - Implement the Markdown Parsing Layer and Parse Result Model
+
+Create `@markhere/markdown-engine`.
+
+Input:
+
+```text
+Markdown string + capability profile + revision
+```
+
+Output:
+
+```text
+parsed tree
+heading map
+resource references
+diagnostics
+feature usage
+```
+
+Parser output is derived data and should be disposable/rebuildable.
+
+Every result must carry source revision so asynchronous consumers can reject stale results.
+
+Do not mutate canonical Markdown while parsing.
+
+**Acceptance criteria**
+
+Parsing revision 17 can never accidentally be applied as current preview if document has advanced to revision 18.
+
+**Traceability:** ADR-038, ADR-045.
+
+---
+
+## Issue 4.3 - Build the Read-Only Preview Renderer
+
+Implement Preview Mode's render engine independent of edit controls.
+
+It must support:
+
+* headings;
+* paragraphs;
+* emphasis;
+* strong;
+* strikethrough;
+* blockquotes;
+* lists;
+* task lists;
+* tables;
+* links;
+* images;
+* thematic breaks;
+* inline code;
+* fenced code;
+* math;
+* diagrams;
+* sanitized raw HTML.
+
+Preview DOM must never be treated as canonical source.
+
+Typing into preview should do nothing.
+
+**Acceptance criteria**
+
+The canonical Markdown fixture renders correctly without modifying `DocumentBuffer`.
+
+**Traceability:** FR-PREV-001 through FR-PREV-007.
+
+---
+
+## Issue 4.4 - Implement Code Block Rendering and Syntax Highlighting
+
+Create an explicit code-rendering path.
+
+Requirements:
+
+* preserve exact code text;
+* preserve fence language;
+* safely escape HTML;
+* do not execute code;
+* highlight recognized languages;
+* fall back to plain code for unknown languages;
+* render very large blocks with bounded cost where practical.
+
+Syntax highlighting is presentation only.
+
+Never rewrite source simply because the highlighter normalizes language aliases.
+
+**Acceptance criteria**
+
+A code block containing `<script>` displays as text and does not execute.
+
+**Traceability:** FR-MD-006, FR-WYS-003.
+
+---
+
+## Issue 4.5 - Implement Tables, Tasks, Front Matter, and Unknown-Syntax Preservation
+
+Implement visual support for GFM tables, task lists, and strikethrough.
+
+Front matter must be recognized and preserved.
+
+Unknown syntax must remain untouched in canonical Markdown even if MarkHere cannot visually edit it.
+
+For unsupported syntax:
+
+* source mode remains exact;
+* preview may show escaped/plain representation;
+* WYSIWYG may expose a protected/raw block;
+* save must not delete it.
+
+This is one of MarkHere's most important anti-data-loss requirements.
+
+**Acceptance criteria**
+
+Opening and saving a fixture containing an unsupported extension without editing does not remove or normalize the unknown syntax.
+
+**Traceability:** ADR-018, FR-MD-007, FR-MD-008.
+
+---
+
+## Issue 4.6 - Implement Mermaid Rendering Safely
+
+Use Mermaid strictly as a diagram renderer.
+
+Never permit diagram content to gain Electron or filesystem privileges.
+
+Configure restrictive security behavior.
+
+Rendering should occur through a bounded service/worker where appropriate.
+
+A malformed diagram should produce:
+
+```text
+Diagram could not be rendered
+[diagnostic summary]
+```
+
+while leaving:
+
+* source visible;
+* rest of document rendered;
+* application responsive.
+
+Do not blank the entire preview because one diagram fails.
+
+**Acceptance criteria**
+
+Malicious Mermaid fixtures cannot execute JavaScript or open privileged URLs.
+
+**Traceability:** FR-PREV-005, ADR-019.
+
+---
+
+## Issue 4.7 - Implement KaTeX/Math Rendering
+
+Support inline and display mathematics.
+
+Input remains Markdown source.
+
+Render failures must become localized diagnostics rather than fatal page errors.
+
+Sanitize any generated or supplied markup according to the security design.
+
+Do not automatically fetch remote math resources.
+
+Ensure mathematical content has an export representation defined later.
+
+**Acceptance criteria**
+
+Malformed math affects only the relevant expression/block.
+
+**Traceability:** FR-PREV-006, ADR-019.
+
+---
+
+## Issue 4.8 - Implement `markhere-resource://` and Local Resource Capabilities
+
+Local images must not be exposed through unrestricted `file://`.
+
+Create resource scope per document/workspace.
+
+Example:
+
+```text
+markhere-resource://<scope>/<resource-token>
+```
+
+Main resolves the token to an authorized path.
+
+Implement:
+
+* MIME detection;
+* path containment;
+* directory traversal protection;
+* resource-size limits;
+* cache invalidation;
+* SVG special handling.
+
+An image reference must not allow:
+
+```text
+../../../../private-file
+```
+
+to escape the resource scope.
+
+**Acceptance criteria**
+
+Traversal security fixtures return blocked/not-found without revealing file contents.
+
+**Traceability:** ADR-012, ADR-036, FR-RES-001 through FR-RES-003.
+
+---
+
+## Issue 4.9 - Implement Link Resolution, Anchors, and URL Classification
+
+Create one resolver handling:
+
+```text
+#local-anchor
+other.md
+other.md#section
+https://...
+mailto:...
+relative images
+Windows paths
+```
+
+Heading slugs must be deterministic and work with duplicate and non-ASCII headings.
+
+Do not classify `C:\...` using browser URL assumptions.
+
+External URLs are returned to `ShellService`; local Markdown links are routed through FileService.
+
+**Acceptance criteria**
+
+`guide.md#安装` opens the target file and navigates to the expected heading without treating the fragment as filename text.
+
+**Traceability:** FR-PREV-007 through FR-PREV-009, ADR-046.
+
+---
+
+## Issue 4.10 - Implement Render Scheduling, Cancellation, and Failure Isolation
+
+Preview rendering must never make typing unresponsive.
+
+Create a render coordinator:
+
+```text
+edit revision 50
+↓
+debounce
+↓
+parse/render request r50
+↓
+edit revision 51
+↓
+cancel/obsolete r50
+↓
+render r51
+```
+
+For ordinary split-mode documents, target preview update within the documented ~250 ms expectation.
+
+Heavy diagram/render work should be isolated from the interactive renderer when justified. Electron's `utilityProcess` provides a main-process API for Node-capable utility child processes and is appropriate for selected isolated work. ([Electron][6])
+
+**Acceptance criteria**
+
+Old render results never replace a newer preview.
+
+**Traceability:** NFR-PERF-002 through NFR-PERF-005, ADR-021, ADR-040.
+
+---
+
+# Issue 5 - Implement Source, WYSIWYG, Preview, and Split Editing as Four First-Class Modes
+
+The four modes are architectural, not cosmetic:
+
+```text
+Preview
+WYSIWYG
+Source
+Split
+```
+
+Every mode operates against the same canonical revisioned Markdown state.
+
+## Issue 5.1 - Implement the `ModeController`
+
+Create explicit mode enum:
+
+```ts
+type DocumentMode =
+  | 'preview'
+  | 'wysiwyg'
+  | 'source'
+  | 'split'
+```
+
+The controller owns:
+
+* active mode;
+* transition state;
+* adapter mount/unmount;
+* flush-before-transition;
+* selection transfer;
+* scroll anchor transfer;
+* failure rollback.
+
+Do not let individual Vue components independently change mode.
+
+Persist default open mode in settings.
+
+**Acceptance criteria**
+
+All 12 directional transitions between four modes are programmatically representable and tested.
+
+**Traceability:** ADR-009, FR-SET-003.
+
+---
+
+## Issue 5.2 - Implement Source Mode with CodeMirror 6
+
+Use CodeMirror 6 according to ADR-007.
+
+CodeMirror 6 uses immutable `EditorState` and transactions for updates, which is well suited to MarkHere's revision mutation adapter. ([CodeMirror][2])
+
+Implement:
+
+* Markdown highlighting;
+* line numbers setting;
+* selections;
+* undo/redo;
+* find;
+* replace;
+* keyboard commands;
+* theme support.
+
+On CodeMirror document change:
+
+1. obtain new Markdown;
+2. commit mutation against current revision;
+3. receive resulting revision;
+4. update adapter metadata.
+
+Do not save directly from CodeMirror.
+
+**Acceptance criteria**
+
+Source editing always changes the canonical buffer before persistence.
+
+**Traceability:** FR-SRC-001 through FR-SRC-006, ADR-007.
+
+---
+
+## Issue 5.3 - Create the Muya-Derived WYSIWYG Adapter
+
+Reuse/adapt relevant Muya behavior behind:
+
+```ts
+WysiwygAdapter
+```
+
+Do not allow Muya internals to leak throughout renderer components.
+
+Responsibilities:
+
+```text
+mount(markdown)
+flush() → markdown
+applyExternalRevision(markdown)
+getSelectionAnchor()
+restoreSelection()
+destroy()
+```
+
+Maintain provenance for reused files.
+
+Before refactoring inherited behavior, establish differential/regression tests against supported MarkText/Muya fixtures.
+
+The WYSIWYG adapter may normalize some Markdown constructs only where the compatibility policy explicitly allows semantic normalization.
+
+**Acceptance criteria**
+
+Muya-derived code can later be replaced without redesigning `DocumentSession`.
+
+**Traceability:** ADR-006, ADR-002, NFR-MNT-005.
+
+---
+
+## Issue 5.4 - Implement WYSIWYG Core Formatting Capabilities
+
+Support visual editing for required P0 constructs:
+
+* headings;
+* paragraphs;
+* emphasis;
+* strong;
+* strikethrough;
+* lists;
+* blockquotes;
+* links;
+* images;
+* tables;
+* task lists;
+* fenced code;
+* thematic breaks.
+
+Implement commands through the MarkHere command layer rather than component-specific logic.
+
+When a visual operation changes Markdown:
+
+```text
+Muya operation
+→ adapter flush/serialized Markdown
+→ canonical mutation
+→ revision increment
+```
+
+**Acceptance criteria**
+
+Every supported visual operation survives Source → Save → reopen.
+
+**Traceability:** FR-WYS-001 through FR-WYS-004.
+
+---
+
+## Issue 5.5 - Integrate First-Class Preview Mode
+
+Create full-document reading mode using the preview pipeline from Issue 4.
+
+Preview UI must omit edit affordances while preserving:
+
+* selection/copy;
+* link interaction through policy;
+* TOC navigation;
+* scroll;
+* zoom/theme behavior.
+
+Switching into Preview must flush pending source/WYSIWYG edits first.
+
+Switching out does not reconstruct Markdown from rendered HTML.
+
+**Acceptance criteria**
+
+Entering and leaving Preview without editing produces no document mutation.
+
+**Traceability:** FR-PREV-001, ADR-009.
+
+---
+
+## Issue 5.6 - Implement Safe Mode Transitions and Pending-Edit Flush
+
+This is a data-loss-sensitive sub-issue.
+
+Before changing adapters:
+
+```text
+1. freeze transition
+2. ask current editor to flush pending operation batch
+3. commit resulting Markdown if changed
+4. capture revision
+5. capture structural selection/scroll anchor
+6. destroy/suspend outgoing adapter
+7. initialize target from exact canonical revision
+8. restore navigation state
+9. complete transition
+```
+
+Same-frame edits must not disappear during transitions.
+
+If target adapter initialization fails, retain canonical Markdown and return to a safe usable mode, preferably Source.
+
+**Acceptance criteria**
+
+Typing and immediately pressing the mode shortcut never loses the final character.
+
+**Traceability:** FR-WYS-002, FR-WYS-005, FR-SRC-006, ADR-038.
+
+---
+
+## Issue 5.7 - Implement Split Mode
+
+Split Mode contains:
+
+```text
+Source | Preview
+```
+
+using the same session.
+
+Implement:
+
+* resizable divider;
+* remembered ratio;
+* preview debounce;
+* independent scrollbars;
+* source always usable when preview fails;
+* optional preview refresh indicator.
+
+Do not instantiate a second canonical document.
+
+Each preview response includes revision and is ignored if stale.
+
+**Acceptance criteria**
+
+Editing source revision 100 causes preview revision 100 or later—never revision 99.
+
+**Traceability:** FR-SPLIT-001 through FR-SPLIT-003, FR-SPLIT-006.
+
+---
+
+## Issue 5.8 - Implement Structural Scroll Synchronization
+
+Do not synchronize using:
+
+```text
+source scroll percent == preview scroll percent
+```
+
+because Markdown blocks have different heights.
+
+Use heading/block structural anchors.
+
+Concept:
+
+```text
+cursor/source viewport
+→ nearest parsed block
+→ structural anchor
+→ corresponding preview element
+```
+
+Allow users to disable synchronization.
+
+Handle:
+
+* long code blocks;
+* images;
+* large tables;
+* hidden/front matter blocks;
+* diagrams.
+
+**Acceptance criteria**
+
+Navigation remains approximately aligned across a fixture with uneven block heights.
+
+**Traceability:** FR-SPLIT-004, FR-SPLIT-005.
+
+---
+
+## Issue 5.9 - Implement Selection, Undo/Redo, and Command Consistency
+
+Each adapter may have internal undo state, but mode switching must never resurrect obsolete Markdown.
+
+Before transitions:
+
+* flush outgoing state;
+* create appropriate undo boundary;
+* do not let old editor history overwrite newer canonical revisions.
+
+Implement command routing based on mode.
+
+Examples:
+
+```text
+Bold → WYSIWYG formatting command
+Bold → Source Markdown wrapping where defined
+Bold → disabled in Preview
+```
+
+Copy/paste semantics must respect security and image policy.
+
+**Acceptance criteria**
+
+Undo after WYSIWYG → Source transition never reverts the entire document to a stale WYSIWYG snapshot.
+
+**Traceability:** FR-WYS-005, Data Model §28.
+
+---
+
+## Issue 5.10 - Complete the Full Mode-Transition and Editor Regression Matrix
+
+Test:
+
+```text
+Preview → WYSIWYG
+Preview → Source
+Preview → Split
+WYSIWYG → Preview
+WYSIWYG → Source
+WYSIWYG → Split
+Source → Preview
+Source → WYSIWYG
+Source → Split
+Split → Preview
+Split → WYSIWYG
+Split → Source
+```
+
+For each transition test:
+
+* no-edit transition;
+* dirty document;
+* pending same-frame edit;
+* large file;
+* unsupported syntax;
+* malformed diagram;
+* active selection;
+* scroll position;
+* undo/redo.
+
+Issue 5 cannot close until this matrix is green.
+
+**Traceability:** Testing Strategy §8, ADR-043.
+
+---
+
+# Issue 6 - Implement the MarkHere Desktop Workspace, Navigation, Settings, Themes, Accessibility, and Productivity Features
+
+This issue turns the editor engines into a complete desktop application.
+
+## Issue 6.1 - Build the Main Desktop Shell, Tabs, Sidebar, and Status Bar
+
+Implement the primary Vue application shell.
+
+Suggested layout:
+
+```text
+Menu/title
+Toolbar
+Tabs
+Sidebar | Document area
+Status bar
+```
+
+Tabs must display:
+
+* filename;
+* dirty state;
+* conflict state;
+* active state.
+
+Do not rely on color alone for dirty/conflict status.
+
+Status bar can expose:
+
+```text
+mode
+line/column
+encoding
+line endings
+word count
+save status
+```
+
+Keep visual state in renderer but document data in `DocumentSessionStore`.
+
+**Acceptance criteria**
+
+A user can open multiple documents and clearly distinguish saved, dirty, and conflicted files.
+
+**Traceability:** NFR-A11Y-005, System Overview §12.
+
+---
+
+## Issue 6.2 - Implement Workspace Opening and File Tree
+
+Implement folder selection through authorized dialog token.
+
+Main creates:
+
+```text
+WorkspaceId
+WorkspaceCapability
+trusted root path
+```
+
+Renderer receives safe tree DTOs.
+
+Support:
+
+* files;
+* folders;
+* expand/collapse;
+* Markdown identification;
+* open entry;
+* create file;
+* create directory;
+* rename;
+* move;
+* trash.
+
+All mutation requests use relative paths under main-owned root.
+
+Reject:
+
+```text
+..
+absolute paths
+device paths
+root escapes
+```
+
+**Acceptance criteria**
+
+A compromised renderer cannot mutate a path above workspace root.
+
+**Traceability:** FR-WS-001, API Design §9, ADR-035.
+
+---
+
+## Issue 6.3 - Implement Live Workspace Tree Updates
+
+Connect workspace watcher events to tree updates.
+
+Handle:
+
+* file created;
+* folder created;
+* rename;
+* delete;
+* external editor modifications.
+
+Debounce burst events.
+
+Preserve expanded folder state where possible.
+
+Do not rebuild an enormous workspace tree for every single filesystem event.
+
+Watchers must detach when workspace closes.
+
+**Acceptance criteria**
+
+Creating `docs/new.md` externally causes the file to appear without restarting MarkHere.
+
+**Traceability:** FR-WS-002, Storage Strategy §26.
+
+---
+
+## Issue 6.4 - Implement Recursive Workspace Search
+
+Implement cancellable text search.
+
+Use ripgrep or another reviewed search engine behind main/worker abstraction.
+
+Search request includes:
+
+```text
+workspaceId
+query
+case mode
+whole-word
+optional file pattern
+```
+
+Search must:
+
+* ignore binaries;
+* obey excluded directories;
+* avoid leaving workspace root;
+* emit progress/results;
+* support cancellation.
+
+Do not block renderer while searching a large repository.
+
+**Acceptance criteria**
+
+Cancelling a long search terminates underlying work and stops result events.
+
+**Traceability:** FR-WS-003, FR-WS-004, ADR-040.
+
+---
+
+## Issue 6.5 - Implement Document Outline and Table of Contents
+
+Build outline from parsed heading information.
+
+Each heading entry includes:
+
+```text
+level
+display text
+slug
+structural anchor
+source position
+```
+
+Support:
+
+* nested hierarchy;
+* duplicate headings;
+* Unicode headings;
+* click-to-navigate;
+* active-heading indication.
+
+Do not parse headings independently in every UI component.
+
+**Acceptance criteria**
+
+Outline navigation works identically in Preview, Source, WYSIWYG, and Split.
+
+**Traceability:** FR-WS-005.
+
+---
+
+## Issue 6.6 - Implement Recent Documents and Workspaces
+
+Persist local metadata only.
+
+Store stable recent IDs and display information.
+
+Features:
+
+* reopen file;
+* reopen workspace;
+* remove item;
+* clear recent list;
+* handle missing files gracefully.
+
+Do not include file contents.
+
+Do not use recent-path strings as unrestricted capabilities; reopening must revalidate the path and generate a new capability.
+
+**Acceptance criteria**
+
+Clearing recent history removes metadata without deleting any document.
+
+**Traceability:** FR-WS-006, ADR-034.
+
+---
+
+## Issue 6.7 - Implement Versioned Settings and Migrations
+
+Create `MarkHereSettings`.
+
+Required v1 settings include:
+
+```text
+appearance
+default mode
+autosave
+remote-resource policy
+line numbers
+split divider
+scroll synchronization
+keybindings
+```
+
+Persist settings in app-specific userData.
+
+Validate every update in main.
+
+Security settings such as renderer sandbox state must **not** be user-settable.
+
+Each schema revision requires migration.
+
+**Acceptance criteria**
+
+Corrupt settings fall back safely without preventing document access.
+
+**Traceability:** FR-SET-001 through FR-SET-007, ADR-037.
+
+---
+
+## Issue 6.8 - Implement Keybindings and Command Palette
+
+Build keybindings over stable command IDs.
+
+Requirements:
+
+* defaults;
+* custom overrides;
+* reset;
+* validation;
+* collision feedback;
+* platform-aware presentation.
+
+The command palette searches available commands and respects current enablement.
+
+Do not attach unrelated one-off keyboard listeners in components.
+
+**Acceptance criteria**
+
+Changing Save to a valid alternative shortcut updates behavior without modifying save implementation.
+
+**Traceability:** FR-SRC-005, FR-SET-006.
+
+---
+
+## Issue 6.9 - Implement Theme, High-DPI, Keyboard, and Accessibility Support
+
+Support:
+
+```text
+Light
+Dark
+System
+```
+
+System mode follows OS appearance changes.
+
+Core workflows must be keyboard accessible.
+
+Provide:
+
+* visible focus;
+* accessible control names;
+* tooltips for icon-only controls;
+* sufficient semantic roles;
+* high-DPI scaling;
+* no fixed-pixel layout dependency;
+* state indicators beyond color.
+
+Test Windows scaling at common levels such as 100%, 125%, 150%, and 200%.
+
+**Acceptance criteria**
+
+Open → edit → save → export can be performed without a mouse.
+
+**Traceability:** NFR-A11Y-001 through NFR-A11Y-005.
+
+---
+
+## Issue 6.10 - Implement Clipboard, Drag-and-Drop, Image Import, and Autosave UX
+
+Complete common document workflows.
+
+For pasted/dropped images:
+
+1. acquire data through approved preload/browser mechanism;
+2. validate MIME and size;
+3. ask selected image-storage strategy;
+4. save/copy through main capability;
+5. generate relative Markdown reference;
+6. update canonical buffer.
+
+Supported storage policies may include:
+
+```text
+beside document
+configured image directory
+data URI where allowed
+future uploader
+```
+
+Also implement autosave using the normal serialized save pipeline—never a separate write shortcut.
+
+Autosave must respect conflict detection.
+
+**Acceptance criteria**
+
+Pasting an image never gives renderer arbitrary write access and autosave cannot silently overwrite an external conflict.
+
+**Traceability:** FR-WYS-007, FR-SAVE-008, Storage Strategy §24.
+
+---
+
+# Issue 7 - Implement the Unified Export Architecture for HTML, PDF, DOCX, and Printing
+
+All exports operate on a deterministic revision snapshot.
+
+No exporter is allowed to read “whatever happens to be in the editor right now” midway through export.
+
+## Issue 7.1 - Implement Export Job Coordination and Revision Snapshots
+
+Create `ExportCoordinator`.
+
+Start request captures:
+
+```text
+documentId
+revision
+Markdown
+format
+options
+target token
+resource scope
+```
+
+Generate:
+
+```text
+jobId
+status
+progress
+correlationId
+```
+
+Job lifecycle:
+
+```text
+queued
+preparing
+rendering
+writing
+completed
+failed
+cancelled
+```
+
+Editing may continue while export runs.
+
+Later edits do not mutate an already-running job.
+
+**Acceptance criteria**
+
+Export started at revision 25 contains revision 25 even when editor reaches revision 30 before completion.
+
+**Traceability:** FR-EXP-004, ADR-038.
+
+---
+
+## Issue 7.2 - Implement the Shared Export Intermediate Representation
+
+Build the `ExportIR` required by ADR-022.
+
+Represent semantic elements:
+
+```text
+document
+heading
+paragraph
+text run
+emphasis
+link
+list
+list item
+table
+code block
+blockquote
+image
+diagram
+math
+thematic break
+```
+
+Avoid making HTML the universal intermediate representation because native DOCX semantics such as heading styles, relationships, numbering, and tables should not be reconstructed from presentation HTML.
+
+Keep source references for diagnostics.
+
+**Acceptance criteria**
+
+HTML/PDF/DOCX exporters consume the same semantic snapshot rather than independently reparsing Markdown inconsistently.
+
+**Traceability:** ADR-022.
+
+---
+
+## Issue 7.3 - Implement Standalone HTML Export
+
+Generate a self-contained or predictably packaged HTML document.
+
+Required:
+
+* UTF-8;
+* semantic headings;
+* lists;
+* tables;
+* links;
+* code;
+* blockquotes;
+* safe styling;
+* image policy;
+* Mermaid/math representation;
+* sanitized raw HTML.
+
+Do not export the live editable WYSIWYG DOM.
+
+Set a deterministic document title and metadata.
+
+Test in normal browsers.
+
+**Acceptance criteria**
+
+Exported HTML opens outside MarkHere without requiring Electron.
+
+**Traceability:** FR-EXP-001, NFR-COMP-004.
+
+---
+
+## Issue 7.4 - Implement the Hardened PDF Print Renderer
+
+PDF generation must use a dedicated print surface.
+
+Pipeline:
+
+```text
+ExportIR
+→ sanitized print HTML
+→ isolated hidden print WebContents
+→ printToPDF
+→ validated output
+```
+
+The print renderer must:
+
+* have no Node integration;
+* follow strict CSP;
+* not inherit editor capabilities;
+* resolve only authorized resources;
+* be destroyed after completion.
+
+Support page size, margins, orientation, and later headers/footers.
+
+**Acceptance criteria**
+
+PDF generation failure cannot crash or freeze the main editor.
+
+**Traceability:** ADR-024, NFR-REL-004, FR-EXP-002.
+
+---
+
+## Issue 7.5 - Implement Native DOCX Package Generation
+
+Use a reviewed JavaScript/TypeScript DOCX library; do not automate installed Microsoft Word.
+
+Map:
+
+```text
+H1-H6 → native Word heading styles
+paragraphs → Word paragraphs
+bold/italic → runs
+links → relationships
+```
+
+Produce valid OOXML `.docx`.
+
+The architecture explicitly requires Word not to be installed.
+
+**Acceptance criteria**
+
+DOCX is successfully generated in headless CI and opens in Microsoft Word-compatible software.
+
+**Traceability:** ADR-023, FR-DOCX-001, FR-DOCX-005, FR-DOCX-007.
+
+---
+
+## Issue 7.6 - Implement Native DOCX Lists, Tables, Blockquotes, and Code
+
+Do not fake structural content using plain text.
+
+Implement:
+
+* Word numbering definitions for ordered/unordered lists;
+* nested list levels;
+* native `<w:tbl>` tables;
+* code paragraph style;
+* preserved code line breaks;
+* blockquote style/indent;
+* thematic break representation.
+
+Task lists should have a documented representation such as Unicode checkbox symbols or Word-compatible structures.
+
+**Acceptance criteria**
+
+OOXML structural tests confirm tables and numbered lists are real Word structures.
+
+**Traceability:** FR-DOCX-002, FR-DOCX-003, FR-DOCX-006.
+
+---
+
+## Issue 7.7 - Implement Images, Mermaid, and Math Across Export Formats
+
+Resolve local images only through the export snapshot's resource capability.
+
+For DOCX:
+
+* embed image media parts;
+* create relationships;
+* preserve reasonable dimensions.
+
+For Mermaid:
+
+```text
+diagram source
+→ safe render
+→ SVG/PNG representation
+→ exporter
+```
+
+For math:
+
+```text
+math
+→ safe rendered form
+→ PDF/HTML directly
+→ compatible embedded representation for DOCX v1
+```
+
+Never silently omit an unsupported asset.
+
+**Acceptance criteria**
+
+A document containing image + diagram + equation exports without broken placeholders unless an explicit diagnostic is shown.
+
+**Traceability:** FR-EXP-009, FR-DOCX-004.
+
+---
+
+## Issue 7.8 - Build Export UI, Progress, Cancellation, and Errors
+
+Create a unified Export dialog.
+
+Allow format-specific options.
+
+Expose progress phases:
+
+```text
+Preparing
+Rendering diagrams
+Building document
+Writing file
+Finishing
+```
+
+Cancel button calls:
+
+```ts
+window.markhere.exports.cancel(jobId)
+```
+
+Cancellation must remove incomplete temporary output.
+
+Expected errors use `ErrorDTO`, not uncaught exceptions.
+
+**Acceptance criteria**
+
+Cancelling an export never leaves a misleading final file at the selected destination.
+
+**Traceability:** FR-EXP-005 through FR-EXP-007, ADR-040.
+
+---
+
+## Issue 7.9 - Implement Printing
+
+Normal printing uses the same sanitized print representation as PDF where practical.
+
+Do not print the live editor DOM containing controls/cursors.
+
+Provide:
+
+* page settings;
+* print dialog;
+* clean printable styles;
+* safe resource resolution.
+
+Printing failure should not mutate document state.
+
+**Acceptance criteria**
+
+Printed output contains document content but no editor toolbar, caret, sidebar, or Markdown editing controls.
+
+**Traceability:** FR-EXP-010.
+
+---
+
+## Issue 7.10 - Isolate Export Work, Manage Temporary Storage, and Verify Output
+
+Long-running export operations must be isolated when they could block renderer interaction.
+
+Use controlled job directories such as:
+
+```text
+%TEMP%\MarkHere\exports\<jobId>
+```
+
+On complete/cancel/failure:
+
+* release resources;
+* destroy hidden renderers;
+* kill worker when necessary;
+* delete temp content;
+* preserve only intended final artifact.
+
+Add structural verification after generation where practical:
+
+* PDF header/readability;
+* ZIP validity for DOCX;
+* OOXML required parts.
+
+**Acceptance criteria**
+
+Repeated exports do not leak temporary directories or hidden WebContents.
+
+**Traceability:** ADR-021, Storage Strategy §28, NFR-PERF-005.
+
+---
+
+# Issue 8 - Implement Security Enforcement, Error Handling, Logging, Crash Recovery, Privacy, and Operational Hardening
+
+Issue 8 converts the architectural security model into product-wide controls.
+
+## Issue 8.1 - Implement the Security Policy Service and Threat-Model Controls
+
+Create `SecurityPolicy` as a centralized service.
+
+It should answer policy questions such as:
+
+```text
+mayOpenExternalUrl
+mayLoadRemoteImage
+mayResolveLocalResource
+mayNavigate
+mayCreateWindow
+mayReadCapability
+mayWriteCapability
+```
+
+Do not duplicate URL/path security decisions inside Vue components.
+
+Map controls against STRIDE risks documented in `06-security-design.md`.
+
+**Acceptance criteria**
+
+Security-sensitive operations have a single reviewed policy authority.
+
+**Traceability:** Security Design §6, ADR-046.
+
+---
+
+## Issue 8.2 - Enforce CSP, Navigation, Remote-Resource, and Network Policies
+
+Configure restrictive CSP.
+
+At minimum, avoid permissive:
+
+```text
+script-src *
+'unsafe-eval'
+```
+
+unless a dependency forces a temporary reviewed exception.
+
+Deny renderer navigation to arbitrary URLs.
+
+Remote `http://` resources are blocked by default.
+
+Remote `https://` images follow explicit user policy.
+
+No Markdown document may cause arbitrary network requests through hidden DOM tricks.
+
+**Acceptance criteria**
+
+A malicious Markdown fixture cannot navigate MarkHere to a remote page or automatically fetch blocked HTTP content.
+
+**Traceability:** NFR-SEC-005, FR-RES-004, FR-RES-005, ADR-047.
+
+---
+
+## Issue 8.3 - Harden Raw HTML, SVG, Mermaid, and DOM Insertion
+
+Use a reviewed sanitizer such as DOMPurify with a MarkHere-specific configuration.
+
+Never directly use unsafe `v-html` with unsanitized user Markdown.
+
+Treat SVG as active-capable content.
+
+Reject:
+
+* scripts;
+* inline event handlers;
+* dangerous URLs;
+* foreign objects where policy disallows;
+* javascript/data abuse.
+
+Apply defense consistently to preview and exports.
+
+**Acceptance criteria**
+
+The complete malicious HTML/SVG test corpus cannot execute code.
+
+**Traceability:** FR-PREV-004, FR-RES-006, ADR-019.
+
+---
+
+## Issue 8.4 - Harden Filesystem and Resource Capability Validation
+
+Perform path validation in main.
+
+Test:
+
+```text
+../
+..\ 
+UNC
+device paths
+symlink escape
+percent encoding
+double encoding
+mixed separators
+Unicode edge cases
+```
+
+Workspace-relative operations must remain underneath the root after normalization/resolution.
+
+Resource capabilities expire when document/workspace closes.
+
+**Acceptance criteria**
+
+No traversal fixture can read or write outside authorized scope.
+
+**Traceability:** Security Design §§19-23, ADR-014, ADR-036.
+
+---
+
+## Issue 8.5 - Add Request Budgets, Cancellation, and IPC Abuse Protection
+
+Define safe bounds for:
+
+* IPC string size;
+* image transfer size;
+* Markdown size before alternate large-file handling;
+* URL length;
+* export options;
+* search query length;
+* concurrent export jobs.
+
+Prefer asynchronous APIs.
+
+Synchronous IPC is prohibited except a future documented, measured startup-critical exception.
+
+Repeated invalid requests should be logged/rate-limited enough to avoid trivial renderer-driven main-process denial of service.
+
+**Acceptance criteria**
+
+Oversized or invalid IPC requests return controlled validation errors rather than excessive memory allocation.
+
+**Traceability:** ADR-039, ADR-040, Security Design §33.
+
+---
+
+## Issue 8.6 - Implement Structured Error Types and User-Facing Error Mapping
+
+Create the `ErrorDTO` architecture.
+
+Categories:
+
+```text
+validation
+filesystem
+conflict
+markdown
+render
+security
+export
+workspace
+update
+cancelled
+internal
+```
+
+Every expected failure receives stable error code, such as:
+
+```text
+FS_PERMISSION_DENIED
+FS_DISK_FULL
+DOC_EXTERNAL_CONFLICT
+EXPORT_FAILED
+SEC_URL_BLOCKED
+```
+
+UI consumes `messageKey` and safe details.
+
+Do not display raw stack traces in normal user dialogs.
+
+**Acceptance criteria**
+
+Common filesystem/export/security failures show actionable messages without exposing sensitive internals.
+
+**Traceability:** Error Handling §§2-6.
+
+---
+
+## Issue 8.7 - Implement Structured, Redacted Local Logging
+
+Create a logging facade shared by processes.
+
+Log events include:
+
+```text
+timestamp
+level
+event
+process
+appVersion
+channel
+correlationId
+documentId
+jobId
+duration
+errorCode
+safe metadata
+```
+
+Never log:
+
+* Markdown bodies;
+* clipboard contents;
+* recovery Markdown;
+* arbitrary query content;
+* secrets;
+* full URLs with sensitive queries by default.
+
+Paths should be redacted or represented in a privacy-preserving form where detailed path is unnecessary.
+
+**Acceptance criteria**
+
+Automated tests search logs after fixture execution and verify unique secret/document text is absent.
+
+**Traceability:** ADR-032, ADR-033, NFR-PRIV-002.
+
+---
+
+## Issue 8.8 - Implement Crash Handling, Diagnostic Bundles, and Safe Mode
+
+Main should handle:
+
+* uncaught exceptions;
+* unhandled rejections;
+* renderer crash;
+* worker crash.
+
+Renderer crash must not automatically discard recoverable dirty state.
+
+Track repeated startup crashes and offer safe mode that may disable:
+
+* session restoration;
+* optional expensive rendering;
+* potentially problematic cached state.
+
+Diagnostic bundle must be user-initiated.
+
+Include:
+
+```text
+app version
+platform
+error codes
+redacted logs
+build metadata
+```
+
+Exclude document bodies.
+
+**Acceptance criteria**
+
+Crash-loop fixture reaches a safe usable shell instead of endlessly reopening the crash condition.
+
+**Traceability:** Error Handling §§13-15, NFR-REL-006.
+
+---
+
+## Issue 8.9 - Implement Dependency Security and Production Hardening Checks
+
+Add:
+
+* lockfile auditing;
+* dependency review;
+* SBOM;
+* prohibited package review;
+* Electron version currency review;
+* native dependency inventory;
+* license validation;
+* build hardening checks.
+
+Electron recommends examining available package-time fuses as part of its security checklist. ([Electron][1])
+
+Fuse application itself will occur with packaging in Issue 9, but security policy and expected values are established here.
+
+**Acceptance criteria**
+
+Release cannot proceed with an unresolved critical dependency/security finding without an explicit documented exception.
+
+**Traceability:** NFR-SEC-008, NFR-SEC-009, ADR-030.
+
+---
+
+## Issue 8.10 - Build and Gate the Security Regression Corpus
+
+Create fixtures for:
+
+```text
+script tags
+event-handler HTML
+javascript URLs
+data URLs
+malicious SVG
+Mermaid payloads
+path traversal
+UNC/device paths
+oversized documents
+malformed IPC
+arbitrary navigation
+window.open
+resource exfiltration
+external protocol abuse
+```
+
+Run relevant subset on each PR and full suite before releases.
+
+Security regressions and data-loss regressions are release blockers, not ordinary bugs.
+
+**Acceptance criteria**
+
+A known vulnerability fixture cannot be removed from the test suite without security review.
+
+**Traceability:** ADR-043, Security Design §34.
+
+---
+
+# Issue 9 - Package, Sign, Integrate, Update, and Deploy MarkHere on Windows 11
+
+Windows 11 x64 is the first release-blocking target.
+
+MarkHere uses electron-builder + NSIS initially according to ADR-026.
+
+One current electron-builder detail is particularly important: built-in NSIS `fileAssociations` works only when `nsis.perMachine` is `true`, while MarkHere explicitly wants a per-user installer by default. ([Electron Builder][7]) Therefore the architecture's custom registration strategy must not be replaced with a naive config block.
+
+## Issue 9.1 - Create Production electron-builder Configuration
+
+Configure:
+
+```text
+appId
+productName
+executableName
+ASAR
+build resources
+artifact output
+NSIS target
+ZIP target
+x64
+future ARM64
+```
+
+Desired filenames:
+
+```text
+MarkHere-win-x64-<version>-setup.exe
+MarkHere-win-x64-<version>.zip
+```
+
+Exclude:
+
+* source tests;
+* development configs;
+* credentials;
+* unnecessary package documentation;
+* large unused source maps.
+
+Keep required license notices.
+
+**Acceptance criteria**
+
+Clean Windows CI build produces launchable NSIS + ZIP artifacts.
+
+**Traceability:** ADR-026, Deployment Strategy §§6-8.
+
+---
+
+## Issue 9.2 - Finalize Product Identity and Windows Resources
+
+Freeze before public stable release:
+
+```text
+appId
+publisher identity
+executable
+install directory naming
+update identity
+ProgID
+protocol names
+icons
+```
+
+Produce correct `.ico` resources for:
+
+* executable;
+* installer;
+* Markdown documents.
+
+Version metadata in binary must match release.
+
+Do not change these casually after stable release because Windows defaults/update identity may depend on them.
+
+**Acceptance criteria**
+
+Installed executable properties display correct MarkHere name/version/publisher.
+
+**Traceability:** Deployment Strategy §7.
+
+---
+
+## Issue 9.3 - Implement the Per-User NSIS Installer
+
+Default installation must not require admin privileges.
+
+Installer responsibilities:
+
+* install application;
+* create Start menu shortcut;
+* optional desktop shortcut;
+* register uninstall information;
+* register MarkHere as Markdown handler candidate;
+* preserve user documents;
+* upgrade previous compatible version.
+
+Do not simply copy MarkText's current installer script line-for-line.
+
+Test installation paths containing Unicode.
+
+**Acceptance criteria**
+
+A standard Windows 11 user installs and launches MarkHere without elevation.
+
+**Traceability:** Deployment Strategy §11.
+
+---
+
+## Issue 9.4 - Implement Markdown File Registration Without Forcing Windows Defaults
+
+Register candidate support for:
+
+```text
+.md
+.markdown
+.mmd
+.mdown
+.mdtext
+.mdtxt
+```
+
+`.mdx` remains optional/source-only.
+
+Do not manipulate protected Windows `UserChoice` to force default ownership.
+
+Provide onboarding action:
+
+> Make MarkHere my default Markdown application
+
+that opens the appropriate Windows settings experience/instructions.
+
+Current electron-builder documentation's per-machine restriction on built-in NSIS file association reinforces why this must be explicitly tested in MarkHere's custom per-user installer path. ([Electron Builder][7])
+
+**Acceptance criteria**
+
+MarkHere appears under “Open with” while respecting an existing user's default choice.
+
+**Traceability:** ADR-028, Deployment Strategy §9.
+
+---
+
+## Issue 9.5 - Implement Explorer/File Activation and CLI Launch Behavior
+
+Support:
+
+```powershell
+markhere README.md
+markhere .
+markhere --new-window README.md
+```
+
+Future conversion flags can be added only after exporters stabilize.
+
+When Windows activates:
+
+```text
+markhere.exe "C:\path\README.md"
+```
+
+route it through normal file validation.
+
+Second instance forwards request to first.
+
+Do not evaluate CLI arguments through PowerShell/cmd.
+
+Define documented exit codes.
+
+**Acceptance criteria**
+
+Paths containing spaces, `#`, `%`, Unicode, and parentheses open correctly through CLI and Explorer.
+
+**Traceability:** FR-APP-001, API Design §§28-29.
+
+---
+
+## Issue 9.6 - Implement Windows Code Signing
+
+Stable releases must be Authenticode-signed.
+
+Configure protected signing credentials in CI.
+
+Sequence must ensure:
+
+1. binaries finalized;
+2. fuses applied;
+3. package assembled;
+4. binaries/installers signed;
+5. timestamp applied;
+6. signatures verified;
+7. artifact published.
+
+Never print certificate credentials.
+
+Current electron-builder documentation notes that signing supports publisher verification and allows the updater to validate downloaded Windows installer signatures. ([Electron Builder][8])
+
+**Acceptance criteria**
+
+`Get-AuthenticodeSignature` reports a valid trusted signature on stable artifacts.
+
+**Traceability:** ADR-029, NFR-SEC-010.
+
+---
+
+## Issue 9.7 - Apply and Verify Electron Fuses and ASAR Hardening
+
+After compatibility testing, set production fuse policy.
+
+Candidates from the architecture:
+
+```text
+RunAsNode = disabled
+NodeOptions = disabled
+NodeCliInspect = disabled
+OnlyLoadAppFromAsar = enabled if compatible
+EmbeddedAsarIntegrityValidation = enabled if compatible
+GrantFileProtocolExtraPrivileges = disabled
+```
+
+Electron fuses are package-time feature switches intended specifically to disable unused powerful behavior. ([Electron][9])
+
+Run a verification script against every packaged binary.
+
+**Acceptance criteria**
+
+CI stores fuse inspection results as release evidence.
+
+**Traceability:** ADR-030, NFR-SEC-008.
+
+---
+
+## Issue 9.8 - Implement Signed Auto-Update Channels
+
+Implement:
+
+```text
+dev — none/local
+alpha
+beta
+stable
+```
+
+Renderer must never choose arbitrary update feed URLs.
+
+Use `electron-updater` through main.
+
+States:
+
+```text
+idle
+checking
+available
+not-available
+downloading
+downloaded
+error
+```
+
+Windows NSIS is supported by electron-updater, and current electron-builder documentation describes Windows Authenticode verification for downloaded updates. ([Electron Builder][10])
+
+Update requests must never upload Markdown content.
+
+**Acceptance criteria**
+
+A tampered/wrong-publisher update fails closed.
+
+**Traceability:** FR-UPD-001 through FR-UPD-004, ADR-029.
+
+---
+
+## Issue 9.9 - Implement Upgrade, Migration, Uninstall, and Rollback Behavior
+
+Test upgrades across supported schema versions.
+
+Upgrade must preserve:
+
+```text
+user Markdown
+settings
+recents where compatible
+recovery state when valid
+```
+
+Uninstall may offer removal of MarkHere application data, but must never delete arbitrary Markdown/export documents.
+
+If a new release fails:
+
+* existing installed version must not be corrupted;
+* recovery files remain inspectable;
+* update failure produces actionable error.
+
+Rollback strategy must account for schema compatibility.
+
+**Acceptance criteria**
+
+Upgrade fixture from previous stable retains settings and user files.
+
+**Traceability:** Deployment Strategy §§27-29.
+
+---
+
+## Issue 9.10 - Build the Reproducible Release Pipeline
+
+Stable pipeline:
+
+```text
+clean checkout
+↓
+frozen dependency install
+↓
+lint/typecheck/tests
+↓
+full security tests
+↓
+build
+↓
+fuses
+↓
+sign
+↓
+artifact/system tests
+↓
+SBOM/notices/checksums
+↓
+publish release metadata/artifacts
+```
+
+Record:
+
+```text
+commit SHA
+version
+lockfile hash
+Electron version
+builder version
+signature information
+checksums
+SBOM
+test run
+```
+
+Do not allow a developer laptop to be the authoritative stable build mechanism.
+
+**Acceptance criteria**
+
+Every published artifact can be traced to a specific commit and CI run.
+
+**Traceability:** ADR-041, Deployment Strategy §§21-25.
+
+---
+
+# Issue 10 - Implement the Full Automated Testing, Performance, Accessibility, Compatibility, and Release-Acceptance Program
+
+Issue 10 is not “write some tests at the end.”
+
+Tests should be added throughout Issues 1-9, but this main issue completes the system-level quality strategy and makes release gates enforceable.
+
+Playwright currently describes Electron support as experimental, so MarkHere must use Playwright Electron E2E **plus** Windows system/installer testing rather than relying on Playwright as the only release evidence. ([Playwright][11])
+
+## Issue 10.1 - Create the Canonical Test Fixture Repository
+
+Create:
+
+```text
+packages/test-fixtures/
+```
+
+Include one comprehensive:
+
+```text
+markdown-everything.md
+```
+
+plus targeted fixtures for:
+
+* CommonMark;
+* GFM;
+* tables;
+* tasks;
+* Mermaid;
+* math;
+* HTML;
+* SVG;
+* Unicode;
+* huge documents;
+* encoding;
+* CRLF/LF;
+* unsupported syntax;
+* malformed syntax;
+* local images;
+* relative links.
+
+Fixtures must be version-controlled and deterministic.
+
+Never use private user documents as test fixtures.
+
+**Acceptance criteria**
+
+Every supported Markdown capability has at least one positive and one edge-case fixture.
+
+**Traceability:** Testing Strategy §6, §44.
+
+---
+
+## Issue 10.2 - Complete Unit and State-Machine Tests
+
+Test pure packages heavily.
+
+Document buffer tests must cover:
+
+```text
+new document
+first edit
+multiple edits
+save current revision
+save stale revision
+save failure
+reload
+recovery
+external conflict
+Save As
+```
+
+Property tests should verify:
+
+```text
+dirty === revision !== persistedRevision
+```
+
+for generated valid state transitions.
+
+Test path normalization, encoding detection, fingerprint comparisons, settings migrations, and error mapping.
+
+**Acceptance criteria**
+
+Core document correctness is testable without launching Electron.
+
+**Traceability:** Testing Strategy §§5, 7.
+
+---
+
+## Issue 10.3 - Run CommonMark, GFM, and MarkHere Markdown Conformance Suites
+
+Use official CommonMark applicable examples where compatible with the chosen parser.
+
+Record deviations rather than silently accepting them.
+
+Test GFM:
+
+```text
+tables
+task lists
+strikethrough
+autolinks where supported
+```
+
+Then test registered MarkHere extensions.
+
+Maintain compatibility manifest:
+
+```text
+supported
+partially supported
+source-preserved
+unsupported
+```
+
+CommonMark's current reference specification is 0.31.2. ([CommonMark Spec][3])
+
+**Acceptance criteria**
+
+Release artifacts include or link to a deterministic compatibility/conformance report.
+
+**Traceability:** FR-MD-001 through FR-MD-008, ADR-050.
+
+---
+
+## Issue 10.4 - Complete Editor, Component, and Mode Tests
+
+Test:
+
+* Source transactions;
+* WYSIWYG adapter;
+* toolbar commands;
+* Preview;
+* Split;
+* mode transitions;
+* selection restoration;
+* undo behavior;
+* stale render rejection.
+
+For Muya-derived functionality, establish differential tests against upstream behavior for features MarkHere intentionally retains.
+
+Do not lock tests to incidental Vue DOM implementation unless visual/interaction behavior requires it.
+
+**Acceptance criteria**
+
+A refactor that preserves public behavior does not require mass rewriting of tests.
+
+**Traceability:** Testing Strategy §§8-13.
+
+---
+
+## Issue 10.5 - Complete Preload, IPC, and Main-Service Integration Tests
+
+Test every `window.markhere` method.
+
+Verify:
+
+* correct DTO accepted;
+* malformed DTO rejected;
+* wrong sender rejected;
+* wrong capability rejected;
+* expected errors use `ApiResult`;
+* Electron event objects never cross bridge;
+* renderer cannot invoke arbitrary channels.
+
+Integration-test:
+
+```text
+FileService
+WorkspaceService
+SettingsService
+RecoveryService
+ShellService
+ExportCoordinator
+```
+
+**Acceptance criteria**
+
+Every privileged API listed in `05-api-design.md` has positive, negative, and authorization tests.
+
+**Traceability:** Testing Strategy §§14-16.
+
+---
+
+## Issue 10.6 - Complete Filesystem, Conflict, Recovery, and Fault-Injection Testing
+
+Test real temporary filesystems.
+
+Atomic save cases:
+
+* permission denied;
+* disk-full simulation where feasible;
+* temporary file failure;
+* replace failure;
+* process interruption;
+* file lock/sharing violation.
+
+Watcher cases:
+
+* own save;
+* external save;
+* delete;
+* rename;
+* rapid consecutive writes;
+* cloud/network-like delayed events.
+
+Recovery cases:
+
+* renderer crash;
+* process termination;
+* clean close;
+* stale snapshot;
+* document mismatch.
+
+**Acceptance criteria**
+
+No tested failure mode knowingly produces partial final document contents.
+
+**Traceability:** Testing Strategy §§17-20, ADR-043.
+
+---
+
+## Issue 10.7 - Complete HTML, PDF, and DOCX Verification Tests
+
+HTML:
+
+* DOM structure;
+* encoding;
+* resources;
+* sanitization.
+
+PDF:
+
+* valid file;
+* expected page settings;
+* text presence;
+* visual regression for representative pages;
+* links/images where test tooling permits.
+
+DOCX:
+
+* ZIP integrity;
+* `[Content_Types].xml`;
+* document XML;
+* relationships;
+* image media;
+* heading styles;
+* numbering;
+* native tables;
+* hyperlink relationships.
+
+Also perform interoperability checks in Microsoft Word/LibreOffice-compatible software.
+
+**Acceptance criteria**
+
+An exporter cannot be declared working solely because a non-empty file was produced.
+
+**Traceability:** Testing Strategy §§21-24.
+
+---
+
+## Issue 10.8 - Complete Packaged Windows 11 E2E and System Tests
+
+Run tests against the actual installer/package, not only `pnpm dev`.
+
+Test:
+
+```text
+install
+launch
+Start menu
+open .md
+Open With
+single instance
+spaces/Unicode paths
+save
+Save As
+export PDF
+export DOCX
+update
+uninstall
+```
+
+Test clean Windows 11 x64 VMs.
+
+Add ARM64 only when architecture support is officially enabled.
+
+Playwright Electron can cover application interactions, but Windows shell/installer behavior requires complementary system testing because Playwright's Electron integration remains experimental. ([Playwright][11])
+
+**Acceptance criteria**
+
+The exact artifact proposed for release completes the primary user journey.
+
+**Traceability:** NFR-COMP-001, ADR-041, ADR-042.
+
+---
+
+## Issue 10.9 - Complete Performance, Soak, Accessibility, Unicode, and Large-File Testing
+
+Define fixture classes from the requirements.
+
+Measure:
+
+* cold start;
+* typing input-to-paint;
+* split preview latency;
+* file open time;
+* memory;
+* export responsiveness;
+* search responsiveness.
+
+Targets include:
+
+```text
+cold start <= 2.5s on agreed reference PC
+typical typing p95 < 50ms
+ordinary split preview typically <= 250ms
+no >50ms synchronous filesystem/export operation on renderer interaction path
+```
+
+Run long-duration soak tests with repeated:
+
+```text
+open
+edit
+switch mode
+close
+export
+workspace search
+```
+
+Test Unicode including:
+
+* Sinhala;
+* Tamil;
+* CJK;
+* emoji;
+* combining characters;
+* accented Latin.
+
+Run accessibility checks and keyboard workflow tests.
+
+**Acceptance criteria**
+
+Any breached release performance budget is investigated/documented rather than silently ignored.
+
+**Traceability:** NFR-PERF-001 through NFR-PERF-006, Testing Strategy §§30-34.
+
+---
+
+## Issue 10.10 - Build the Final Requirement Traceability and Release-Candidate Gate
+
+Create a machine-readable or maintained traceability matrix:
+
+```text
+Requirement
+→ architecture component
+→ implementation issue
+→ source package
+→ test
+→ release evidence
+```
+
+For example:
+
+```text
+FR-SAVE-003
+→ FileService atomic save
+→ Issue 3.5
+→ packages/...
+→ atomic-save.spec.ts
+→ CI test run
+```
+
+Before `1.0.0`, verify every P0 requirement in `02-requirements-and-scope.md`.
+
+The release-candidate gate must include:
+
+* all PR tests;
+* Markdown conformance;
+* security corpus;
+* data-loss tests;
+* export verification;
+* installer tests;
+* updater test;
+* signature verification;
+* fuse verification;
+* license/provenance validation;
+* SBOM;
+* performance test;
+* accessibility smoke test;
+* manual Windows acceptance scenario.
+
+A security or known data-loss regression blocks release regardless of schedule.
+
+**Acceptance criteria**
+
+There are **zero unaccounted P0 requirements** when MarkHere 1.0 is tagged.
+
+**Traceability:** Requirements §12-13, Testing Strategy §§45-49, ADR-043.
+
+---
+
+# Implementation Dependency Order
+
+Although GitHub can contain all 10 main issues from the beginning, the implementation dependency chain should effectively be:
+
+```text
+Issue 1
+Repository + Architecture Foundation
+        │
+        ▼
+Issue 2
+Secure Electron Boundary
+        │
+        ▼
+Issue 3
+Document State + Storage + Recovery
+        │
+        ├──────────────┐
+        ▼              ▼
+Issue 4            Issue 6 partial
+Markdown Core      Basic App Shell
+        │
+        ▼
+Issue 5
+Four Editing Modes
+        │
+        ├──────────────────┐
+        ▼                  ▼
+Issue 6                Issue 7
+Workspace/UX           Export System
+        │                  │
+        └────────┬─────────┘
+                 ▼
+             Issue 8
+       Security + Operations
+                 │
+                 ▼
+             Issue 9
+       Windows Distribution
+                 │
+                 ▼
+            Issue 10
+     Final Release Qualification
+```
+
+The most important rule for the project is that **Issue 10 tests are not postponed until Issue 10**. Every sub-issue above should ship its own tests when implemented. Issue 10 completes cross-system, release-artifact, performance, installer, compatibility, and acceptance testing.
+
+This backlog preserves the core architectural invariants from all 11 documents: **Markdown remains canonical; renderer authority is restricted; files are accessed through capabilities; saves are revision-aware and atomic; external changes cannot be silently overwritten; recovery is separate from Save; unsupported syntax is preserved; expensive operations are cancellable/isolated; exports use immutable revision snapshots and shared IR; Windows 11 is first-class; deployment artifacts are signed/tested; and security/data-loss regressions block release.**
+
+[1]: https://www.electronjs.org/docs/latest/tutorial/security?utm_source=chatgpt.com "Security | Electron"
+[2]: https://codemirror.net/docs/guide/?utm_source=chatgpt.com "CodeMirror System Guide"
+[3]: https://spec.commonmark.org/spec?utm_source=chatgpt.com "CommonMark Spec"
+[4]: https://www.electronjs.org/docs/latest/tutorial/context-isolation?utm_source=chatgpt.com "Context Isolation | Electron"
+[5]: https://www.electronjs.org/docs/latest/api/protocol?utm_source=chatgpt.com "protocol | Electron"
+[6]: https://www.electronjs.org/docs/latest/api/utility-process?utm_source=chatgpt.com "utilityProcess | Electron"
+[7]: https://www.electron.build/docs/api/app-builder-lib.interface.fileassociation/?utm_source=chatgpt.com "Interface: FileAssociation | electron-builder"
+[8]: https://www.electron.build/docs/features/security/?utm_source=chatgpt.com "Security & Hardening | electron-builder"
+[9]: https://www.electronjs.org/docs/latest/tutorial/fuses?utm_source=chatgpt.com "Electron Fuses | Electron"
+[10]: https://www.electron.build/docs/features/auto-update/?utm_source=chatgpt.com "Auto Update | electron-builder"
+[11]: https://playwright.dev/docs/api/class-electron?utm_source=chatgpt.com "Electron | Playwright"
