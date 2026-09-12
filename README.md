@@ -4,20 +4,43 @@ MarkHere is a local-first Electron Markdown desktop application being built as a
 
 ## Architecture status
 
-This repository currently implements **Issue 1 — Repository, Toolchain, Architecture Boundaries, and Provenance** from `docs/12-implementation-plan,md`.
+This repository implements:
 
-The 11 architecture documents in `docs/01-...` through `docs/11-...` are normative for implementation. When code and an architecture document disagree, stop and resolve the conflict rather than silently changing the architecture.
+- **Issue 1 — Establish the MarkHere Repository, Toolchain, Architecture Boundaries, and Provenance**
+- **Issue 2 — Build the Secure Electron Application Shell and Privileged API Boundary**
+
+The 11 architecture documents in `docs/01-...` through `docs/11-...` are normative. `docs/12-implementation-plan,md` is the implementation backlog derived from them. When implementation and architecture disagree, resolve the architecture conflict explicitly rather than silently weakening a boundary.
+
+## Issue 2 security model
+
+Production renderer content is loaded from `markhere://app`, not as the application `file://` origin. All editor/settings windows are sandboxed and context-isolated with Node integration disabled. The renderer receives only the versioned semantic API exposed as:
+
+```ts
+window.markhere
+```
+
+The bridge contains the reviewed namespaces (`app`, `window`, `dialogs`, `files`, `workspaces`, `resources`, `settings`, `recovery`, `exports`, `shell`, `clipboard`, `updates`, `events`) and **does not expose raw `ipcRenderer`**. Every privileged main-process operation validates the registered sending window/frame, runtime DTO schema, and capability ownership where applicable.
+
+Later-domain bridge methods already have their stable typed shape but fail closed until their owning implementation issue is completed; there is no temporary generic filesystem API.
+
+See:
+
+- `docs/development/issue-02-implementation.md`
+- `docs/development/issue-02-security-baseline.md`
+- `docs/development/issue-02-validation.md`
 
 ## Pinned development baseline
 
 - Node.js `22.16.0`
 - pnpm `10.33.4`
-- Electron `42.11.3` baseline
+- Electron `42.11.3`
 - TypeScript `6.0.3`
 - Vue `3.5.38`
 - Pinia `3.0.4`
 - electron-vite `5.0.0`
-- CodeMirror 6 packages are owned by `@markhere/source-editor`
+- CodeMirror 6 packages owned by `@markhere/source-editor`
+
+The sandboxed preload is fully bundled into a single CommonJS `index.cjs`; the Electron main process remains ESM.
 
 ## Bootstrap
 
@@ -26,60 +49,69 @@ corepack enable
 corepack prepare pnpm@10.33.4 --activate
 pnpm install --frozen-lockfile
 pnpm check:foundation
+pnpm check:secure-shell
+pnpm format:check
 pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm check:secure-shell:runtime
 pnpm dev
 ```
 
-> **Lockfile finalization:** Issue 1 requires a real `pnpm-lock.yaml`. The implementation environment used to prepare this archive could not reach the npm registry, so it intentionally does not contain a fabricated lockfile. On a network-enabled machine, use the pinned Node/pnpm versions, run `pnpm install`, then `pnpm compliance`, commit the generated `pnpm-lock.yaml` and refreshed `THIRD_PARTY_NOTICES.md`, and rerun `pnpm ci:foundation`. CI deliberately fails when the lockfile is absent. See `docs/development/issue-01-validation.md`.
-
-`pnpm dev` launches only the secure Issue-1 shell. Document IO, typed IPC handlers, custom protocols, and editor functionality belong to later issues.
+> **Lockfile finalization:** the uploaded repository still does not contain a real `pnpm-lock.yaml`, and this implementation environment cannot reach the npm registry. No lockfile has been fabricated. On a network-enabled machine run `pnpm install`, `pnpm compliance`, and the full gate above, then commit the pnpm-generated lockfile and regenerated dependency notices/SBOM. CI deliberately fails while the lockfile is absent. See `docs/development/issue-02-validation.md`.
 
 ## Repository map
 
 ```text
-apps/desktop/               Electron main/preload/Vue renderer shell
-packages/document-model/    Process-neutral document identifiers and contracts
-packages/ipc-contract/      Renderer-facing bridge types (no raw IPC API)
+apps/desktop/               Electron main/preload/Vue renderer/worker boundary
+  src/main/                 lifecycle, WindowManager, protocols, IPC, services, commands
+  src/preload/              one reviewed raw IPC transport + semantic contextBridge
+  src/renderer/             sandboxed Vue application shell
+  src/workers/              reserved isolated worker boundary
+  test/                     Issue-2 main/security tests
+packages/document-model/    Process-neutral document identifiers/contracts
+packages/ipc-contract/      Bridge DTOs, channel maps, Zod runtime schemas
 packages/markdown-engine/   Markdown capability/dialect contracts
 packages/editor-core/       Reserved Muya-derived WYSIWYG boundary
 packages/source-editor/     CodeMirror 6 source-editor boundary
 packages/export-core/       Process-neutral export contracts
-packages/export-*/          Format-specific exporter package boundaries
-packages/security-core/     Pure security policy types/helpers
+packages/export-*/          Format-specific exporter boundaries
+packages/security-core/     Pure URL/security policy helpers
 packages/shared/            Pure reusable TypeScript utilities
 packages/test-fixtures/     Shared deterministic test fixtures
-docs/provenance/            Upstream provenance and license policy
-scripts/                    Architecture/compliance/foundation checks
-build/                      Reserved repository-wide build resources
-tests/                      Reserved cross-system test suites
+docs/provenance/            Upstream provenance/license policy
+scripts/                    Architecture/compliance/security verification
 ```
 
-## Dependency direction
-
-Process-neutral packages must remain free of Electron/Node OS authority. Renderer code must not import Electron or Node built-ins. The preload is a narrow capability bridge and must never expose `ipcRenderer` to the page.
-
-Run:
+## Architecture/security checks
 
 ```bash
 pnpm check:foundation
+pnpm check:secure-shell
 pnpm graph:dependencies
 ```
 
-before opening a PR.
+`check:secure-shell` verifies, among other invariants:
 
-## Product identity
+- centralized BrowserWindow creation;
+- explicit sandbox/context-isolation preferences;
+- `markhere://` routing and CSP;
+- single fully bundled CJS sandbox preload;
+- one raw IPC transport file only;
+- complete semantic bridge namespaces;
+- sender/top-frame/origin validation;
+- fail-closed browser permission handling;
+- central external URL policy;
+- typed `mh:v1:*` channels and runtime schemas;
+- navigation and popup denial.
 
-MarkHere uses its own `MarkHere` application-data namespace, provisional `com.markhere.desktop` application ID, `markhere://` / `markhere-resource://` protocol names, and `mh:v1:` internal IPC namespace. Original neutral placeholder icons live in `apps/desktop/build/icons/`. See `docs/development/product-identity.md`.
+The runtime probe performs the corresponding checks against a real Electron renderer after build.
 
-## CI and branch policy
+## Provenance
 
-The foundation workflow uses a frozen lockfile, caches only the pnpm store, runs formatting/lint/typecheck/tests/architecture/provenance/compliance/build gates, and always uploads diagnostic logs/evidence. Required branch-protection expectations are documented in `docs/development/branch-protection.md`.
-
-The exact validation performed for this Issue-1 implementation is recorded in `docs/development/issue-01-validation.md`.
+MarkHere is independent from MarkText. No copied/adapted MarkText/Muya source is present in the current tree. If future work selectively reuses upstream code, it must be marked with `@markhere-upstream`, recorded in `docs/provenance/provenance.json`, and retain the applicable upstream notice. See `THIRD_PARTY_NOTICES.md`.
 
 ## License
 
-Original MarkHere source is currently **all rights reserved / not licensed for redistribution** until the project owner selects a final source license. Third-party components retain their own licenses. See `THIRD_PARTY_NOTICES.md` and `docs/provenance/`.
+Original MarkHere source is currently **all rights reserved / not licensed for redistribution** until the project owner selects a final source license. Third-party components retain their own licenses.

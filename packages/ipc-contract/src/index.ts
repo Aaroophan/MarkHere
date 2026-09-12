@@ -1,17 +1,15 @@
-import type { MARKHERE_BRIDGE_VERSION } from '@markhere/shared'
-
-export interface AppRuntimeInfo {
-  readonly productName: 'MarkHere'
-  readonly bridgeVersion: typeof MARKHERE_BRIDGE_VERSION
-  readonly platform: string
-  readonly arch: string
-  readonly electronVersion: string
-  readonly chromeVersion: string
-  readonly nodeVersion: string
-}
-
-export interface MarkHereBridge {
-  readonly app: {
-    getRuntimeInfo(): AppRuntimeInfo
-  }
-}
+export type * from './bridge'
+export * from './internal-channels'
+export * from './schemas'
+export type * from './dto/app'
+export type * from './dto/clipboard'
+export type * from './dto/common'
+export type * from './dto/dialogs'
+export type * from './dto/events'
+export type * from './dto/export'
+export type * from './dto/files'
+export type * from './dto/recovery'
+export type * from './dto/resources'
+export type * from './dto/settings'
+export type * from './dto/update'
+export type * from './dto/workspace'

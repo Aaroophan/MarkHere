@@ -26,9 +26,11 @@
     "licenses": "node scripts/compliance.mjs licenses",
     "sbom": "node scripts/compliance.mjs sbom",
     "compliance": "node scripts/compliance.mjs all",
-    "ci:foundation": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm check:foundation && pnpm compliance && pnpm build",
+    "ci:foundation": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm check:foundation && pnpm check:secure-shell && pnpm compliance && pnpm build",
     "graph:dependencies": "node scripts/generate-dependency-graph.mjs",
-    "check:manifests": "node scripts/check-manifests.mjs"
+    "check:manifests": "node scripts/check-manifests.mjs",
+    "check:secure-shell": "node scripts/verify-secure-shell.mjs",
+    "check:secure-shell:runtime": "pnpm --filter @markhere/desktop security:probe"
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",

@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["electron"],
+    "lib": ["ES2023", "DOM"],
+    "baseUrl": "."
+  },
+  "include": ["src/preload/**/*.ts"]
+}

@@ -3,9 +3,12 @@
   "version": "0.1.0-alpha.0",
   "private": true,
   "type": "module",
-  "description": "Channel-free public bridge contracts shared by preload and renderer",
+  "description": "Typed, runtime-validated MarkHere renderer/main capability contract",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./bridge": "./src/bridge.ts",
+    "./channels": "./src/internal-channels.ts",
+    "./schemas": "./src/schemas.ts"
   },
   "types": "./src/index.ts",
   "scripts": {
@@ -14,6 +17,7 @@
   },
   "dependencies": {
     "@markhere/document-model": "workspace:*",
-    "@markhere/shared": "workspace:*"
+    "@markhere/shared": "workspace:*",
+    "zod": "4.6.2"
   }
 }

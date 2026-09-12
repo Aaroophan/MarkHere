@@ -55,8 +55,13 @@ for (const file of await files(repo)) {
     }
   }
 
-  if ((inRenderer || inPreload) && /ipcRenderer\s*\.(?:send|invoke|sendSync)/.test(text)) {
-    violations.push(`${rel}: raw ipcRenderer call is forbidden in renderer-facing layers`)
+  if (inRenderer && /ipcRenderer\s*\.(?:send|invoke|sendSync|on|once)/.test(text)) {
+    violations.push(`${rel}: raw ipcRenderer is forbidden in renderer code`)
+  }
+  if (inPreload && /ipcRenderer\s*\.(?:send|invoke|sendSync|on|once)/.test(text)) {
+    if (rel !== 'apps/desktop/src/preload/transport.ts') {
+      violations.push(`${rel}: raw ipcRenderer is allowed only in the reviewed preload transport`)
+    }
   }
 
   if (inRenderer && /\b(?:process|Buffer|require|__dirname|__filename)\b/.test(text)) {
