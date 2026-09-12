@@ -1,0 +1,19 @@
+{
+  "name": "@markhere/export-pdf",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "type": "module",
+  "description": "PDF export coordinator package boundary",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@markhere/export-core": "workspace:*",
+    "@markhere/shared": "workspace:*"
+  }
+}

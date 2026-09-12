@@ -1,0 +1,9 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Local packages must be explicit workspace: dependencies. Do not implicitly
+# substitute a registry package with the same name.
+linkWorkspacePackages: false
+sharedWorkspaceLockfile: true
+disallowWorkspaceCycles: true

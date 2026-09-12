@@ -1,0 +1,19 @@
+{
+  "name": "@markhere/ipc-contract",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "type": "module",
+  "description": "Channel-free public bridge contracts shared by preload and renderer",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@markhere/document-model": "workspace:*",
+    "@markhere/shared": "workspace:*"
+  }
+}

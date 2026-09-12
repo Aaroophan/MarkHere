@@ -1,0 +1,11 @@
+node_modules
+out
+dist
+coverage
+artifacts
+pnpm-lock.yaml
+*.min.*
+
+# Markdown files include normative architecture documents, generated notices,
+# and exact parser/security fixtures. Do not normalize their source text.
+*.md

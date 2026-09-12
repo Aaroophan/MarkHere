@@ -1,0 +1,16 @@
+MarkHere Source Code License
+
+Copyright (c) 2026 MarkHere contributors.
+All rights reserved.
+
+No permission is granted to copy, modify, distribute, sublicense, or sell the
+original MarkHere source code unless the copyright holder separately grants
+such permission.
+
+Third-party software incorporated into or distributed with MarkHere remains
+subject to its own license terms. See THIRD_PARTY_NOTICES.md and
+`docs/provenance/`.
+
+This project-level license is intentionally conservative until the project
+owner selects a final public source license. Replacing this file is a product
+owner/legal decision and does not alter third-party license obligations.
