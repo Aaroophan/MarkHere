@@ -11,11 +11,14 @@ const exportFormat = z.enum(['html', 'pdf', 'docx'])
 export const FileFingerprintSchema = z.object({
   size: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   mtimeMs: z.number().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  sha256: z.string().regex(/^[a-f0-9]{64}$/i).optional()
+  ctimeMs: z.number().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
+  platformFileId: z.string().max(256).optional()
 }).strict()
 
 export const TextFormatMetadataSchema = z.object({
   encoding: z.string().min(1).max(64),
+  detectedEncodingName: z.string().min(1).max(64).optional(),
   lineEnding: z.enum(['lf', 'crlf', 'cr']),
   hasFinalNewline: z.boolean(),
   bom: z.boolean()
@@ -80,7 +83,9 @@ export const WindowStateEventSchema = z.object({
 
 export const DocumentExternalChangeEventSchema = z.object({
   documentId: id,
-  kind: z.enum(['changed', 'deleted', 'renamed'])
+  kind: z.enum(['changed', 'deleted', 'renamed']),
+  actualFingerprint: FileFingerprintSchema.nullable().optional(),
+  detectedAt: z.string().max(64).optional()
 }).strict()
 
 export const WorkspaceChangeEventSchema = z.object({
@@ -173,7 +178,10 @@ export const INVOKE_ARG_SCHEMAS: Record<InvokeChannel, z.ZodType> = {
     documentId: id,
     revision: z.number().int().positive(),
     persistedRevision: z.number().int().nonnegative(),
-    markdown: z.string().max(32 * 1024 * 1024)
+    markdown: z.string().max(32 * 1024 * 1024),
+    displayPath: z.string().max(32768).optional(),
+    textFormat: TextFormatMetadataSchema.optional(),
+    baseDiskFingerprint: FileFingerprintSchema.nullable().optional()
   }).strict()]),
   [CHANNELS.recoveryList]: voidArgs,
   [CHANNELS.recoveryGet]: oneId,

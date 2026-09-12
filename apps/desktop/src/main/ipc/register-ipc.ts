@@ -26,6 +26,8 @@ import type { DialogService } from '../services/dialog-service'
 import type { ShellService } from '../services/shell-service'
 import type { ClipboardService } from '../services/clipboard-service'
 import type { FutureService } from '../services/future-service'
+import type { FileService } from '../documents/file-service'
+import type { RecoveryService } from '../storage/recovery-service'
 import type { SelectionTokenKind, SelectionTokenStore } from '../services/selection-token-store'
 import { failure } from '../services/api-results'
 import { registerValidatedInvoke, registerValidatedSend } from './validated-ipc'
@@ -39,6 +41,8 @@ export interface IpcServices {
   readonly dialogs: DialogService
   readonly shell: ShellService
   readonly clipboard: ClipboardService
+  readonly files: FileService
+  readonly recovery: RecoveryService
   readonly future: FutureService
 }
 
@@ -87,30 +91,23 @@ export function registerIpcHandlers(services: IpcServices): void {
 
   registerValidatedInvoke(trusted, CHANNELS.fileOpenSelected, (_event, sender, token) =>
     selectionOrFailure<OpenDocumentDTO>(selections, token, 'document-open', sender.webContentsId)
-      ?? services.future.unavailable('files.openSelected'))
-  registerValidatedInvoke(trusted, CHANNELS.fileReopenRecent, () => services.future.unavailable<OpenDocumentDTO>('files.reopenRecent'))
+      ?? services.files.openSelected(token, sender.webContentsId))
+  registerValidatedInvoke(trusted, CHANNELS.fileReopenRecent, (_event, sender, recentId) => services.files.reopenRecent(recentId, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.fileSave, (_event, sender, request) =>
-    ownedOrFailure<SaveDocumentResult>(capabilities, request.documentId, 'document', sender.webContentsId)
-      ?? services.future.unavailable('files.saveDocument'))
+    services.files.saveDocument(request, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.fileSaveAs, (_event, sender, request) =>
-    ownedOrFailure<SaveDocumentResult>(capabilities, request.documentId, 'document', sender.webContentsId)
-      ?? selectionOrFailure<SaveDocumentResult>(selections, request.targetSelectionToken, 'document-save', sender.webContentsId)
-      ?? services.future.unavailable('files.saveDocumentAs'))
+    selectionOrFailure<SaveDocumentResult>(selections, request.targetSelectionToken, 'document-save', sender.webContentsId)
+      ?? services.files.saveDocumentAs(request, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.fileStat, (_event, sender, documentId) =>
-    ownedOrFailure<DocumentStatDTO>(capabilities, documentId, 'document', sender.webContentsId)
-      ?? services.future.unavailable('files.statDocument'))
+    services.files.statDocument(documentId, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.fileReload, (_event, sender, documentId) =>
-    ownedOrFailure<OpenDocumentDTO>(capabilities, documentId, 'document', sender.webContentsId)
-      ?? services.future.unavailable('files.reloadDocument'))
+    services.files.reloadDocument(documentId, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.fileReveal, (_event, sender, documentId) =>
-    ownedOrFailure<void>(capabilities, documentId, 'document', sender.webContentsId)
-      ?? services.future.unavailable('files.revealDocument'))
+    services.files.revealDocument(documentId, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.fileTrash, (_event, sender, documentId) =>
-    ownedOrFailure<void>(capabilities, documentId, 'document', sender.webContentsId)
-      ?? services.future.unavailable('files.trashDocument'))
+    services.files.trashDocument(documentId, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.fileRename, (_event, sender, request) =>
-    ownedOrFailure<FileMutationResult>(capabilities, request.documentId, 'document', sender.webContentsId)
-      ?? services.future.unavailable('files.renameDocument'))
+    services.files.renameDocument(request.documentId, request.newBasename, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.fileCopyImportedImage, (_event, sender, request) =>
     ownedOrFailure<ImportedImageResult>(capabilities, request.documentId, 'document', sender.webContentsId)
       ?? services.future.unavailable('files.copyImportedImage'))
@@ -163,13 +160,13 @@ export function registerIpcHandlers(services: IpcServices): void {
 
   registerValidatedInvoke(trusted, CHANNELS.recoveryUpdate, (_event, sender, request) =>
     ownedOrFailure<RecoveryUpdateResult>(capabilities, request.documentId, 'document', sender.webContentsId)
-      ?? services.future.unavailable('recovery.updateSnapshot'))
-  registerValidatedInvoke(trusted, CHANNELS.recoveryList, () => services.future.unavailable<RecoverySummary[]>('recovery.listRecoverable'))
-  registerValidatedInvoke(trusted, CHANNELS.recoveryGet, () => services.future.unavailable<RecoveryDocumentDTO>('recovery.getSnapshot'))
-  registerValidatedInvoke(trusted, CHANNELS.recoveryDiscard, () => services.future.unavailable<void>('recovery.discard'))
-  registerValidatedInvoke(trusted, CHANNELS.recoveryDiscardForDocument, (_event, sender, documentId) =>
+      ?? services.recovery.updateSnapshot(request, sender.windowId))
+  registerValidatedInvoke(trusted, CHANNELS.recoveryList, () => services.recovery.listRecoverable())
+  registerValidatedInvoke(trusted, CHANNELS.recoveryGet, (_event, _sender, snapshotId) => services.recovery.getSnapshot(snapshotId))
+  registerValidatedInvoke(trusted, CHANNELS.recoveryDiscard, (_event, _sender, snapshotId) => services.recovery.discard(snapshotId))
+  registerValidatedInvoke(trusted, CHANNELS.recoveryDiscardForDocument, (_event, sender, documentId, throughRevision) =>
     ownedOrFailure<void>(capabilities, documentId, 'document', sender.webContentsId)
-      ?? services.future.unavailable('recovery.discardForDocument'))
+      ?? services.recovery.discardForDocument(documentId, throughRevision))
 
   registerValidatedInvoke(trusted, CHANNELS.exportStart, (_event, sender, request) =>
     ownedOrFailure<{ jobId: string }>(capabilities, request.documentId, 'document', sender.webContentsId)
@@ -182,8 +179,7 @@ export function registerIpcHandlers(services: IpcServices): void {
 
   registerValidatedInvoke(trusted, CHANNELS.shellOpenExternal, (_event, _sender, url) => services.shell.openExternal(url))
   registerValidatedInvoke(trusted, CHANNELS.shellShowItemInFolder, (_event, sender, documentId) =>
-    ownedOrFailure<void>(capabilities, documentId, 'document', sender.webContentsId)
-      ?? services.future.unavailable('shell.showItemInFolder'))
+    services.files.revealDocument(documentId, sender.webContentsId))
 
   registerValidatedInvoke(trusted, CHANNELS.clipboardReadImageForImport, () => services.clipboard.readImageForImport())
   registerValidatedInvoke(trusted, CHANNELS.clipboardWriteText, (_event, _sender, text) => services.clipboard.writeText(text))

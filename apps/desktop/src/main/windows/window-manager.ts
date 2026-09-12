@@ -8,6 +8,7 @@ import { clampWindowBounds, type WindowBoundsInput } from './window-bounds'
 import { CloseCoordinator } from './close-coordinator'
 import { CapabilityOwnershipRegistry } from '../security/capability-ownership-registry'
 import { isAllowedApplicationNavigation } from '../security/navigation-policy'
+import type { PersistedWindowState } from '../storage/session-persistence-service'
 
 interface ManagedWindow {
   readonly appWindowId: string
@@ -22,6 +23,7 @@ export interface WindowManagerOptions {
   readonly isDevelopment: boolean
   readonly developmentRendererUrl?: string
   readonly onWindowState?: (window: BrowserWindow) => void
+  readonly onWindowCreated?: (window: BrowserWindow, appWindowId: string) => void
   readonly onRendererReady?: (webContentsId: number) => void
   readonly onWindowDestroyed?: (webContentsId: number) => void
 }
@@ -42,6 +44,7 @@ export class WindowManager {
   readonly #isDevelopment: boolean
   readonly #developmentRendererUrl: string | undefined
   readonly #onWindowState: ((window: BrowserWindow) => void) | undefined
+  readonly #onWindowCreated: ((window: BrowserWindow, appWindowId: string) => void) | undefined
   readonly #onRendererReady: ((webContentsId: number) => void) | undefined
   readonly #onWindowDestroyed: ((webContentsId: number) => void) | undefined
   #sessionSecurityInstalled = false
@@ -53,6 +56,7 @@ export class WindowManager {
     this.#isDevelopment = options.isDevelopment
     this.#developmentRendererUrl = options.developmentRendererUrl
     this.#onWindowState = options.onWindowState
+    this.#onWindowCreated = options.onWindowCreated
     this.#onRendererReady = options.onRendererReady
     this.#onWindowDestroyed = options.onWindowDestroyed
   }
@@ -77,6 +81,30 @@ export class WindowManager {
 
   list(): readonly BrowserWindow[] {
     return [...this.#windows.values()].map((entry) => entry.browserWindow)
+  }
+
+
+  snapshotPersistedWindows(tabProvider?: (webContentsId: number) => PersistedWindowState['tabs']): readonly PersistedWindowState[] {
+    return [...this.#windows.values()]
+      .filter((entry) => entry.kind === 'editor' && !entry.browserWindow.isDestroyed())
+      .map((entry) => {
+        const window = entry.browserWindow
+        const bounds = window.getNormalBounds()
+        return {
+          schemaVersion: 1 as const,
+          id: entry.appWindowId,
+          bounds: {
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.width,
+            height: bounds.height,
+            maximized: window.isMaximized(),
+            fullscreen: window.isFullScreen()
+          },
+          sidebar: { visible: true, width: 280, activePanel: 'files' as const },
+          tabs: tabProvider?.(window.webContents.id) ?? []
+        }
+      })
   }
 
   focusOrCreateEditor(): BrowserWindow {
@@ -138,6 +166,7 @@ export class WindowManager {
     const appWindowId = trustedRecord.windowId
     this.#windows.set(window.id, { appWindowId, kind, browserWindow: window })
     this.#closeCoordinator.register(window)
+    this.#onWindowCreated?.(window, appWindowId)
 
     const preventUnexpectedNavigation = (event: Event, url: string): void => {
       if (!isAllowedApplicationNavigation(url, expectedOrigin)) event.preventDefault()

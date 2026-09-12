@@ -1,11 +1,14 @@
 export interface FileFingerprint {
   readonly size: number
   readonly mtimeMs: number
+  readonly ctimeMs?: number
   readonly sha256?: string
+  readonly platformFileId?: string
 }
 
 export interface TextFormatMetadata {
   readonly encoding: string
+  readonly detectedEncodingName?: string
   readonly lineEnding: 'lf' | 'crlf' | 'cr'
   readonly hasFinalNewline: boolean
   readonly bom: boolean
@@ -16,8 +19,8 @@ export interface OpenDocumentDTO {
   readonly displayPath: string
   readonly basename: string
   readonly markdown: string
-  readonly revision: 1
-  readonly persistedRevision: 1
+  readonly revision: number
+  readonly persistedRevision: number
   readonly fingerprint: FileFingerprint
   readonly textFormat: TextFormatMetadata
   readonly writable: boolean
@@ -46,6 +49,7 @@ export interface SaveDocumentResult {
   readonly displayPath: string
   readonly fingerprint: FileFingerprint
   readonly textFormat: TextFormatMetadata
+  readonly resourceScopeId?: string
 }
 
 export interface DocumentStatDTO {

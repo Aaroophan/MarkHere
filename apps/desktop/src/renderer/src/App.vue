@@ -1,22 +1,27 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import type { AppInfo, AppCommandEvent, WindowStateEvent } from '@markhere/ipc-contract'
+import type { AppInfo, AppCommandEvent, RecoverySummary, WindowStateEvent } from '@markhere/ipc-contract'
 import { RendererCommandRegistry } from './command-registry'
 import { useWindowSessionStore } from './window-session-store'
+import { useDocumentSessionStore } from './document-session-store'
 
 const appInfo = ref<AppInfo | null>(null)
 const errorCode = ref<string | null>(null)
 const lastCommand = ref<string>('none')
+const recoverables = ref<RecoverySummary[]>([])
+const conflictDiskPreview = ref<string | null>(null)
 const windowState = ref<WindowStateEvent>({ maximized: false, fullScreen: false, alwaysOnTop: false })
 const commandRegistry = new RendererCommandRegistry()
 const windowSession = useWindowSessionStore()
+const documents = useDocumentSessionStore()
+const activeDocument = computed(() => windowSession.activeDocumentId ? documents.sessions[windowSession.activeDocumentId] ?? null : null)
 const unsubscribers: Array<() => void> = []
 
 const surface = computed(() => new URLSearchParams(window.location.search).get('surface') === 'settings' ? 'Settings shell' : 'Editor shell')
 
 function registerFoundationCommands(): void {
   const deferredCommands: AppCommandEvent['id'][] = [
-    'file.new', 'file.save', 'file.saveAs',
+    'file.new',
     'file.export.html', 'file.export.pdf', 'file.export.docx',
     'view.mode.preview', 'view.mode.wysiwyg', 'view.mode.source', 'view.mode.split',
     'edit.find', 'edit.replace'
@@ -28,6 +33,43 @@ function registerFoundationCommands(): void {
       lastCommand.value = `${event.id} (${event.source}) — awaiting document services`
     }))
   }
+
+  unsubscribers.push(commandRegistry.register('file.save', async (event) => {
+    lastCommand.value = `${event.id} (${event.source})`
+    const session = activeDocument.value
+    if (!session?.file) return
+    const result = await window.markhere.files.saveDocument({
+      documentId: session.id,
+      revision: session.buffer.revision,
+      markdown: session.buffer.markdown,
+      expectedDiskFingerprint: session.buffer.diskFingerprint,
+      textFormat: session.buffer.textFormat
+    })
+    if (!result.ok) {
+      errorCode.value = result.error.code
+      if (result.error.code === 'DOC_EXTERNAL_CONFLICT') {
+        const stat = await window.markhere.files.statDocument(session.id)
+        documents.enterSaveConflict(session.id, stat.ok ? stat.data.fingerprint : null)
+      }
+    } else documents.applySave(result.data)
+  }))
+  unsubscribers.push(commandRegistry.register('file.saveAs', async (event) => {
+    lastCommand.value = `${event.id} (${event.source})`
+    const session = activeDocument.value
+    if (!session) return
+    const target = await window.markhere.dialogs.chooseSaveDocument(session.file?.basename ?? 'Untitled.md')
+    if (!target.ok) { errorCode.value = target.error.code; return }
+    if (!target.data) return
+    const result = await window.markhere.files.saveDocumentAs({
+      documentId: session.id,
+      revision: session.buffer.revision,
+      markdown: session.buffer.markdown,
+      targetSelectionToken: target.data.selectionToken,
+      textFormat: session.buffer.textFormat
+    })
+    if (!result.ok) errorCode.value = result.error.code
+    else documents.applySaveAs(result.data)
+  }))
 
   unsubscribers.push(commandRegistry.register('file.open', async (event) => {
     lastCommand.value = `${event.id} (${event.source})`
@@ -57,9 +99,72 @@ async function selectMarkdown(): Promise<void> {
     errorCode.value = result.error.code
     return
   }
-  lastCommand.value = result.data.length === 0
-    ? 'file dialog cancelled'
-    : `${result.data.length} authorized selection token(s) issued`
+  if (result.data.length === 0) { lastCommand.value = 'file dialog cancelled'; return }
+  for (const selected of result.data) {
+    const opened = await window.markhere.files.openSelected(selected.selectionToken)
+    if (!opened.ok) { errorCode.value = opened.error.code; continue }
+    documents.open(opened.data)
+    if (!windowSession.tabIds.includes(opened.data.documentId)) windowSession.tabIds.push(opened.data.documentId)
+    windowSession.activeDocumentId = opened.data.documentId
+  }
+  lastCommand.value = `${result.data.length} document selection(s) processed`
+}
+
+
+
+async function inspectConflict(): Promise<void> {
+  const session = activeDocument.value
+  if (!session?.conflict) return
+  const result = await window.markhere.files.reloadDocument(session.id)
+  if (!result.ok) { errorCode.value = result.error.code; return }
+  conflictDiskPreview.value = result.data.markdown.slice(0, 4000)
+}
+
+async function reloadConflictFromDisk(): Promise<void> {
+  const session = activeDocument.value
+  if (!session?.conflict) return
+  const result = await window.markhere.files.reloadDocument(session.id)
+  if (!result.ok) { errorCode.value = result.error.code; return }
+  documents.applyReload(result.data)
+  conflictDiskPreview.value = null
+}
+
+async function overwriteConflict(): Promise<void> {
+  const session = activeDocument.value
+  if (!session?.conflict || !session.file) return
+  const stat = await window.markhere.files.statDocument(session.id)
+  if (!stat.ok) { errorCode.value = stat.error.code; return }
+  const result = await window.markhere.files.saveDocument({
+    documentId: session.id,
+    revision: session.buffer.revision,
+    markdown: session.buffer.markdown,
+    expectedDiskFingerprint: stat.data.fingerprint,
+    textFormat: session.buffer.textFormat
+  })
+  if (!result.ok) { errorCode.value = result.error.code; return }
+  documents.applySave(result.data)
+  conflictDiskPreview.value = null
+}
+
+async function discardRecovery(summary: RecoverySummary): Promise<void> {
+  const result = await window.markhere.recovery.discard(summary.snapshotId)
+  if (!result.ok) { errorCode.value = result.error.code; return }
+  recoverables.value = recoverables.value.filter((item) => item.snapshotId !== summary.snapshotId)
+}
+
+async function loadRecoveries(): Promise<void> {
+  const result = await window.markhere.recovery.listRecoverable()
+  if (result.ok) recoverables.value = result.data
+  else errorCode.value = result.error.code
+}
+
+async function restoreRecovery(summary: RecoverySummary): Promise<void> {
+  const result = await window.markhere.recovery.getSnapshot(summary.snapshotId)
+  if (!result.ok) { errorCode.value = result.error.code; return }
+  documents.restoreRecovery(result.data)
+  if (!windowSession.tabIds.includes(result.data.documentId)) windowSession.tabIds.push(result.data.documentId)
+  windowSession.activeDocumentId = result.data.documentId
+  recoverables.value = recoverables.value.filter((item) => item.snapshotId !== summary.snapshotId)
 }
 
 async function testSafeLink(): Promise<void> {
@@ -71,7 +176,19 @@ onMounted(() => {
   registerFoundationCommands()
   unsubscribers.push(window.markhere.events.onAppCommand((event) => void commandRegistry.execute(event)))
   unsubscribers.push(window.markhere.events.onWindowState((event) => { windowState.value = event }))
+  unsubscribers.push(window.markhere.events.onDocumentExternalChange(async (event) => {
+    const session = documents.sessions[event.documentId]
+    if (!session) return
+    if (!session.buffer.dirty && event.kind === 'changed') {
+      const reloaded = await window.markhere.files.reloadDocument(event.documentId)
+      if (reloaded.ok) documents.applyReload(reloaded.data)
+      else errorCode.value = reloaded.error.code
+      return
+    }
+    documents.handleExternalChange(event)
+  }))
   void loadInfo()
+  void loadRecoveries()
 })
 
 onBeforeUnmount(() => {
@@ -82,7 +199,7 @@ onBeforeUnmount(() => {
 <template>
   <main class="shell">
     <section class="card">
-      <p class="eyebrow">MarkHere • Issue 2</p>
+      <p class="eyebrow">MarkHere • Issue 3</p>
       <h1>{{ surface }}</h1>
       <p>
         The renderer is sandboxed and receives only the reviewed
@@ -95,8 +212,23 @@ onBeforeUnmount(() => {
         <div><dt>Window</dt><dd>{{ windowState.maximized ? 'maximized' : 'normal' }}</dd></div>
         <div><dt>Last command</dt><dd>{{ lastCommand }}</dd></div>
         <div><dt>Window session</dt><dd>{{ windowSession.tabIds.length }} tab(s), {{ windowSession.workspaceId ?? 'no workspace' }}</dd></div>
+        <div><dt>Document</dt><dd>{{ activeDocument?.title ?? 'none' }}<template v-if="activeDocument"> — rev {{ activeDocument.buffer.revision }}/{{ activeDocument.buffer.persistedRevision }}{{ activeDocument.buffer.dirty ? ' dirty' : ' saved' }}{{ activeDocument.conflict ? ' • CONFLICT' : '' }}</template></dd></div>
       </dl>
       <p v-if="errorCode" class="error">{{ errorCode }}</p>
+      <div v-if="recoverables.length" class="recovery">
+        <strong>{{ recoverables.length }} recoverable document(s)</strong>
+        <div v-for="item in recoverables" :key="item.snapshotId" class="recovery-row"><button type="button" @click="restoreRecovery(item)">Restore {{ item.title }}</button><button type="button" @click="discardRecovery(item)">Discard</button></div>
+      </div>
+      <div v-if="activeDocument?.conflict" class="conflict">
+        <strong>External file conflict: {{ activeDocument.conflict.reason }}</strong>
+        <div class="actions">
+          <button type="button" @click="inspectConflict">Compare / Inspect Disk</button>
+          <button type="button" @click="reloadConflictFromDisk">Reload Disk</button>
+          <button type="button" @click="commandRegistry.execute({ id: 'file.saveAs', source: 'system' })">Save Local As…</button>
+          <button type="button" @click="overwriteConflict">Overwrite Disk</button>
+        </div>
+        <pre v-if="conflictDiskPreview">{{ conflictDiskPreview }}</pre>
+      </div>
       <div class="actions">
         <button type="button" @click="commandRegistry.execute({ id: 'file.open', source: 'system' })">Open Markdown…</button>
         <button type="button" @click="testSafeLink">Open Electron Docs</button>
@@ -123,4 +255,8 @@ dt { color: #8d9ab5; } dd { margin: 0; }
 button { border: 1px solid #44506a; border-radius: 9px; background: #20283a; color: #f3f6ff; padding: 10px 14px; cursor: pointer; }
 button:focus-visible { outline: 2px solid #8bb4ff; outline-offset: 2px; }
 .error { color: #ff9a9a; }
+.recovery { display: grid; gap: 8px; margin: 16px 0; padding: 12px; border: 1px solid #775d2b; border-radius: 9px; background: #261f13; }
+.recovery-row { display: flex; gap: 8px; }
+.conflict { display: grid; gap: 10px; margin: 16px 0; padding: 12px; border: 1px solid #8b3e3e; border-radius: 9px; background: #2a1717; }
+.conflict pre { max-height: 220px; overflow: auto; white-space: pre-wrap; background: #111318; padding: 10px; border-radius: 6px; }
 </style>

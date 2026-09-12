@@ -8,6 +8,7 @@ This repository implements:
 
 - **Issue 1 — Establish the MarkHere Repository, Toolchain, Architecture Boundaries, and Provenance**
 - **Issue 2 — Build the Secure Electron Application Shell and Privileged API Boundary**
+- **Issue 3 — Implement the Canonical Document Model, Filesystem Lifecycle, Atomic Persistence, Conflicts, and Recovery**
 
 The 11 architecture documents in `docs/01-...` through `docs/11-...` are normative. `docs/12-implementation-plan,md` is the implementation backlog derived from them. When implementation and architecture disagree, resolve the architecture conflict explicitly rather than silently weakening a boundary.
 
@@ -28,6 +29,15 @@ See:
 - `docs/development/issue-02-implementation.md`
 - `docs/development/issue-02-security-baseline.md`
 - `docs/development/issue-02-validation.md`
+
+## Issue 3 document durability model
+
+Markdown text is the canonical open-session state. `DocumentSession` revisions are monotonic and `dirty` is derived from `revision !== persistedRevision`. Main owns canonical paths through document capabilities; the renderer cannot redirect saves with a display path. Bound-file saves are serialized per document, require an expected disk fingerprint, write to a same-directory temporary file with an explicit flush, and only then replace the target. External modifications cannot be silently overwritten.
+
+Recovery snapshots and UI/session metadata are private, schema-versioned storage separate from the user Markdown file. See:
+
+- `docs/development/issue-03-implementation.md`
+- `docs/development/issue-03-validation.md`
 
 ## Pinned development baseline
 
@@ -50,6 +60,7 @@ corepack prepare pnpm@10.33.4 --activate
 pnpm install --frozen-lockfile
 pnpm check:foundation
 pnpm check:secure-shell
+pnpm check:document-lifecycle
 pnpm format:check
 pnpm lint
 pnpm typecheck
@@ -69,7 +80,7 @@ apps/desktop/               Electron main/preload/Vue renderer/worker boundary
   src/preload/              one reviewed raw IPC transport + semantic contextBridge
   src/renderer/             sandboxed Vue application shell
   src/workers/              reserved isolated worker boundary
-  test/                     Issue-2 main/security tests
+  test/                     Main/security/document-lifecycle tests
 packages/document-model/    Process-neutral document identifiers/contracts
 packages/ipc-contract/      Bridge DTOs, channel maps, Zod runtime schemas
 packages/markdown-engine/   Markdown capability/dialect contracts
@@ -89,6 +100,7 @@ scripts/                    Architecture/compliance/security verification
 ```bash
 pnpm check:foundation
 pnpm check:secure-shell
+pnpm check:document-lifecycle
 pnpm graph:dependencies
 ```
 
