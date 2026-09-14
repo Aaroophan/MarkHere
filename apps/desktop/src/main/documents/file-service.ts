@@ -24,6 +24,7 @@ import { atomicReplaceFile } from './atomic-write'
 import { PerDocumentSaveQueue } from './save-queue'
 import type { WatchService } from './watch-service'
 import type { RecentDocumentStore } from '../storage/recent-document-store'
+import type { ResourceCapabilityBroker } from '../resources/resource-capability-broker'
 
 interface RuntimeDocumentRecord {
   readonly documentId: string
@@ -51,6 +52,7 @@ export class FileService {
   readonly #watch: WatchService
   readonly #runtime = new Map<string, RuntimeDocumentRecord>()
   readonly #recents: RecentDocumentStore
+  readonly #resources: ResourceCapabilityBroker
   readonly #onSaved?: (documentId: string, throughRevision: number) => Promise<void>
 
   constructor(options: {
@@ -58,12 +60,14 @@ export class FileService {
     files: FileCapabilityRegistry
     watch: WatchService
     recents: RecentDocumentStore
+    resources: ResourceCapabilityBroker
     onSaved?: (documentId: string, throughRevision: number) => Promise<void>
   }) {
     this.#selections = options.selections
     this.#files = options.files
     this.#watch = options.watch
     this.#recents = options.recents
+    this.#resources = options.resources
     this.#onSaved = options.onSaved
   }
 
@@ -111,7 +115,7 @@ export class FileService {
       fingerprint,
       textFormat: decoded.textFormat,
       writable,
-      resourceScopeId: randomUUID()
+      resourceScopeId: this.#resources.bindDocument(documentId, ownerWebContentsId, dirname(identity.canonicalPath))
     })
   }
 
@@ -180,7 +184,8 @@ export class FileService {
         this.#watch.recordExpectedWrite({ documentId: request.documentId, canonicalPath: identity.canonicalPath, fingerprint, saveToken: randomUUID(), expiresAt: Date.now() + 5_000 })
         await this.#onSaved?.(request.documentId, request.revision)
         await this.#recents.add(targetRecord.path)
-        return ok({ documentId: request.documentId, savedRevision: request.revision, displayPath: targetRecord.path, fingerprint, textFormat: request.textFormat, resourceScopeId: randomUUID() })
+        const resourceScopeId = this.#resources.rebindDocument(request.documentId, ownerWebContentsId, dirname(identity.canonicalPath))
+        return ok({ documentId: request.documentId, savedRevision: request.revision, displayPath: targetRecord.path, fingerprint, textFormat: request.textFormat, resourceScopeId })
       } catch (error) {
         return mapFsFailure(error, 'save-as')
       }
@@ -215,7 +220,7 @@ export class FileService {
         fingerprint,
         textFormat: decoded.textFormat,
         writable: capability.permissions.has('write'),
-        resourceScopeId: randomUUID()
+        resourceScopeId: this.#resources.scopeForDocument(documentId, ownerWebContentsId) ?? this.#resources.bindDocument(documentId, ownerWebContentsId, dirname(capability.path.canonicalPath))
       })
     } catch (error) { return mapFsFailure(error, 'reload') }
   }
@@ -233,6 +238,7 @@ export class FileService {
       const capability = this.#files.get(documentId, ownerWebContentsId, 'trash')
       await shell.trashItem(capability.path.canonicalPath)
       this.#watch.unwatchDocument(documentId)
+      this.#resources.revokeDocument(documentId)
       this.#files.revoke(documentId)
       this.#runtime.delete(documentId)
       return ok(undefined)
@@ -250,6 +256,7 @@ export class FileService {
       const identity = await identifyExistingPath(target)
       this.#files.replacePath(documentId, ownerWebContentsId, identity, capability.permissions.has('write'), capability.openedVia)
       this.#watch.watchDocument(documentId, identity.canonicalPath)
+      this.#resources.rebindDocument(documentId, ownerWebContentsId, dirname(identity.canonicalPath))
       return ok({ displayPath: target })
     } catch (error) { return mapFsFailure(error, 'rename') }
   }

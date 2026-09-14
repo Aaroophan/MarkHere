@@ -1,12 +1,14 @@
-import { app, net, protocol } from 'electron'
-import { realpath, stat } from 'node:fs/promises'
+import { app, net, protocol, session } from 'electron'
+import { readFile, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { MARKHERE_IDENTITY } from '@markhere/shared'
+import type { ResourceCapabilityBroker } from '../resources/resource-capability-broker'
 import { resolveAppProtocolRequest } from './app-protocol-path'
 
 const APPLICATION_HOST = 'app'
 const APP_ORIGIN = `${MARKHERE_IDENTITY.appProtocol}://${APPLICATION_HOST}`
+const SVG_ACTIVE_XML = /<!\s*(?:DOCTYPE|ENTITY)\b/i
 
 export { resolveAppProtocolRequest } from './app-protocol-path'
 
@@ -50,12 +52,52 @@ function errorResponse(status: number, message: string): Response {
     status,
     headers: {
       'content-type': 'text/plain; charset=utf-8',
-      'cache-control': 'no-store'
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff'
     }
   })
 }
 
-export function installAppProtocolHandlers(rendererRoot = getPackagedRendererRoot()): void {
+function resourceHeaders(mimeType: string, svg: boolean): Headers {
+  const headers = new Headers({
+    'content-type': mimeType,
+    'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff'
+  })
+  if (svg) {
+    // SVG is active-capable XML. Even after the renderer sanitizes SVG used by
+    // Mermaid, local SVG image files are served in a constrained image context
+    // with no script, network, form, frame, or base authority.
+    headers.set(
+      'content-security-policy',
+      "sandbox; default-src 'none'; script-src 'none'; connect-src 'none'; img-src 'none'; media-src 'none'; font-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; style-src 'unsafe-inline'"
+    )
+  }
+  return headers
+}
+
+export function installAppProtocolHandlers(
+  rendererRoot = getPackagedRendererRoot(),
+  resources?: ResourceCapabilityBroker
+): void {
+  // Electron's ProtocolRequest intentionally does not expose the requesting
+  // WebContents. Enforce capability ownership one layer earlier through the
+  // default session's webRequest metadata, which supplies webContentsId and
+  // resourceType. This is the only onBeforeRequest listener in MarkHere;
+  // Electron uses only the last listener registered for a given webRequest
+  // event, so future request policy must be composed into this gate rather
+  // than registering another listener elsewhere.
+  session.defaultSession.webRequest.onBeforeRequest(
+    { urls: [`${MARKHERE_IDENTITY.resourceProtocol}://*/*`] },
+    (details, callback) => {
+      const ownerWebContentsId = details.webContentsId
+      const allowed = details.resourceType === 'image' &&
+        typeof ownerWebContentsId === 'number' &&
+        !!resources?.ownsProtocolRequest(details.url, ownerWebContentsId)
+      callback({ cancel: !allowed })
+    }
+  )
+
   protocol.handle(MARKHERE_IDENTITY.appProtocol, async (request) => {
     const resolution = resolveAppProtocolRequest(request.url, rendererRoot)
     if (!resolution.ok || !resolution.filePath || !resolution.mimeType) {
@@ -91,11 +133,27 @@ export function installAppProtocolHandlers(rendererRoot = getPackagedRendererRoo
     }
   })
 
-  // Issue 4 installs the capability-backed resource broker. Until then the
-  // secure scheme is registered but fails closed instead of exposing file://.
-  protocol.handle(MARKHERE_IDENTITY.resourceProtocol, () =>
-    errorResponse(404, 'Resource capabilities are not available before Issue 4.')
-  )
+  protocol.handle(MARKHERE_IDENTITY.resourceProtocol, async (request) => {
+    if (!resources) return errorResponse(404, 'Resource capability is unavailable.')
+    const resolution = await resources.resolveProtocolRequest(request.url)
+    if (!resolution.ok) return errorResponse(resolution.status, 'Blocked MarkHere document resource request.')
+
+    try {
+      const bytes = await readFile(resolution.resource.canonicalPath)
+      if (resolution.resource.svg) {
+        const source = bytes.toString('utf8')
+        if (SVG_ACTIVE_XML.test(source)) {
+          return errorResponse(415, 'SVG document declarations and entities are not permitted.')
+        }
+      }
+      return new Response(bytes, {
+        status: 200,
+        headers: resourceHeaders(resolution.resource.mimeType, resolution.resource.svg)
+      })
+    } catch {
+      return errorResponse(404, 'Not found.')
+    }
+  })
 }
 
 export function getApplicationOrigin(): string {

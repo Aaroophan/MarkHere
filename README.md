@@ -9,6 +9,7 @@ This repository implements:
 - **Issue 1 — Establish the MarkHere Repository, Toolchain, Architecture Boundaries, and Provenance**
 - **Issue 2 — Build the Secure Electron Application Shell and Privileged API Boundary**
 - **Issue 3 — Implement the Canonical Document Model, Filesystem Lifecycle, Atomic Persistence, Conflicts, and Recovery**
+- **Issue 4 — Implement the Markdown Dialect, Parsing, Safe Rendering, Resource Broker, and Preview Pipeline**
 
 The 11 architecture documents in `docs/01-...` through `docs/11-...` are normative. `docs/12-implementation-plan,md` is the implementation backlog derived from them. When implementation and architecture disagree, resolve the architecture conflict explicitly rather than silently weakening a boundary.
 
@@ -39,6 +40,16 @@ Recovery snapshots and UI/session metadata are private, schema-versioned storage
 - `docs/development/issue-03-implementation.md`
 - `docs/development/issue-03-validation.md`
 
+## Issue 4 Markdown/preview model
+
+MarkHere now has an explicit Markdown capability profile: CommonMark 0.31.2 plus registered GFM/MarkHere extensions. Parsed trees, heading maps, HTML, preview DOM, Mermaid SVG, KaTeX output, and highlighted code remain disposable derivatives of the canonical revisioned Markdown buffer. Raw HTML is sanitized before DOM insertion, links are inert until the main-process resolver classifies them, and local images use document-bound `markhere-resource://` scopes rather than `file://`.
+
+See:
+
+- `docs/development/markdown-compatibility.md`
+- `docs/development/issue-04-implementation.md`
+- `docs/development/issue-04-validation.md`
+
 ## Pinned development baseline
 
 - Node.js `22.16.0`
@@ -49,6 +60,11 @@ Recovery snapshots and UI/session metadata are private, schema-versioned storage
 - Pinia `3.0.4`
 - electron-vite `5.0.0`
 - CodeMirror 6 packages owned by `@markhere/source-editor`
+- markdown-it `15.0.2`
+- DOMPurify `3.4.15`
+- Mermaid `11.15.0`
+- KaTeX `0.18.0`
+- PrismJS `1.30.0`
 
 The sandboxed preload is fully bundled into a single CommonJS `index.cjs`; the Electron main process remains ESM.
 
@@ -61,6 +77,7 @@ pnpm install --frozen-lockfile
 pnpm check:foundation
 pnpm check:secure-shell
 pnpm check:document-lifecycle
+pnpm check:markdown-preview
 pnpm format:check
 pnpm lint
 pnpm typecheck
@@ -70,7 +87,7 @@ pnpm check:secure-shell:runtime
 pnpm dev
 ```
 
-> **Lockfile finalization:** the uploaded repository still does not contain a real `pnpm-lock.yaml`, and this implementation environment cannot reach the npm registry. No lockfile has been fabricated. On a network-enabled machine run `pnpm install`, `pnpm compliance`, and the full gate above, then commit the pnpm-generated lockfile and regenerated dependency notices/SBOM. CI deliberately fails while the lockfile is absent. See `docs/development/issue-02-validation.md`.
+> **Lockfile finalization:** the uploaded repository still does not contain a real `pnpm-lock.yaml`, and this implementation environment cannot reach the npm registry. No lockfile has been fabricated. On a network-enabled machine run `pnpm install`, `pnpm compliance`, and the full gate above, then commit the pnpm-generated lockfile and regenerated dependency notices/SBOM. CI deliberately fails while the lockfile is absent. See `docs/development/issue-04-validation.md`.
 
 ## Repository map
 
@@ -83,7 +100,8 @@ apps/desktop/               Electron main/preload/Vue renderer/worker boundary
   test/                     Main/security/document-lifecycle tests
 packages/document-model/    Process-neutral document identifiers/contracts
 packages/ipc-contract/      Bridge DTOs, channel maps, Zod runtime schemas
-packages/markdown-engine/   Markdown capability/dialect contracts
+packages/markdown-engine/   CommonMark/GFM/MarkHere parser and capability registry
+packages/preview-renderer/  Sanitized read-only preview, Mermaid, KaTeX, Prism, render coordinator
 packages/editor-core/       Reserved Muya-derived WYSIWYG boundary
 packages/source-editor/     CodeMirror 6 source-editor boundary
 packages/export-core/       Process-neutral export contracts
@@ -101,6 +119,7 @@ scripts/                    Architecture/compliance/security verification
 pnpm check:foundation
 pnpm check:secure-shell
 pnpm check:document-lifecycle
+pnpm check:markdown-preview
 pnpm graph:dependencies
 ```
 

@@ -28,6 +28,7 @@ import type { ClipboardService } from '../services/clipboard-service'
 import type { FutureService } from '../services/future-service'
 import type { FileService } from '../documents/file-service'
 import type { RecoveryService } from '../storage/recovery-service'
+import type { ResourceService } from '../resources/resource-service'
 import type { SelectionTokenKind, SelectionTokenStore } from '../services/selection-token-store'
 import { failure } from '../services/api-results'
 import { registerValidatedInvoke, registerValidatedSend } from './validated-ipc'
@@ -42,6 +43,7 @@ export interface IpcServices {
   readonly shell: ShellService
   readonly clipboard: ClipboardService
   readonly files: FileService
+  readonly resources: ResourceService
   readonly recovery: RecoveryService
   readonly future: FutureService
 }
@@ -146,11 +148,14 @@ export function registerIpcHandlers(services: IpcServices): void {
 
   registerValidatedInvoke(trusted, CHANNELS.resourceResolveLink, (_event, sender, request) =>
     ownedOrFailure<ResolvedDocumentLink>(capabilities, request.documentId, 'document', sender.webContentsId)
-      ?? services.future.unavailable('resources.resolveLink'))
+      ?? services.resources.resolveLink(request, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.resourceImportLocalImage, (_event, sender, request) =>
     ownedOrFailure<ImportedImageResult>(capabilities, request.documentId, 'document', sender.webContentsId)
       ?? services.future.unavailable('resources.importLocalImage'))
-  registerValidatedSend(trusted, CHANNELS.resourceInvalidateDocumentCache, () => undefined)
+  registerValidatedSend(trusted, CHANNELS.resourceInvalidateDocumentCache, (_event, sender, documentId) => {
+    if (!capabilities.owns(documentId, 'document', sender.webContentsId)) return
+    try { services.resources.invalidateDocumentCache(documentId, sender.webContentsId) } catch { /* fail closed */ }
+  })
 
   registerValidatedInvoke(trusted, CHANNELS.settingsGet, () => services.future.unavailable<MarkHereSettings>('settings.get'))
   registerValidatedInvoke(trusted, CHANNELS.settingsUpdate, () => services.future.unavailable<MarkHereSettings>('settings.update'))

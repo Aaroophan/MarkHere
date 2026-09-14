@@ -16,13 +16,15 @@
   "dependencies": {
     "@markhere/document-model": "workspace:*",
     "@markhere/ipc-contract": "workspace:*",
+    "@markhere/markdown-engine": "workspace:*",
+    "@markhere/preview-renderer": "workspace:*",
     "@markhere/security-core": "workspace:*",
     "@markhere/shared": "workspace:*",
-    "pinia": "3.0.4",
-    "vue": "3.5.38",
     "chardet": "2.2.0",
     "chokidar": "5.0.0",
-    "iconv-lite": "0.7.3"
+    "iconv-lite": "0.7.3",
+    "pinia": "3.0.4",
+    "vue": "3.5.38"
   },
   "devDependencies": {
     "@types/node": "22.20.2",

@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import type { AppInfo, AppCommandEvent, RecoverySummary, WindowStateEvent } from '@markhere/ipc-contract'
+import type { AppInfo, AppCommandEvent, OpenDocumentDTO, RecoverySummary, WindowStateEvent } from '@markhere/ipc-contract'
 import { RendererCommandRegistry } from './command-registry'
 import { useWindowSessionStore } from './window-session-store'
 import { useDocumentSessionStore } from './document-session-store'
+import PreviewPane from './components/PreviewPane.vue'
 
 const appInfo = ref<AppInfo | null>(null)
 const errorCode = ref<string | null>(null)
 const lastCommand = ref<string>('none')
 const recoverables = ref<RecoverySummary[]>([])
 const conflictDiskPreview = ref<string | null>(null)
+const pendingPreviewAnchor = ref<string | null>(null)
 const windowState = ref<WindowStateEvent>({ maximized: false, fullScreen: false, alwaysOnTop: false })
 const commandRegistry = new RendererCommandRegistry()
 const windowSession = useWindowSessionStore()
@@ -103,14 +105,25 @@ async function selectMarkdown(): Promise<void> {
   for (const selected of result.data) {
     const opened = await window.markhere.files.openSelected(selected.selectionToken)
     if (!opened.ok) { errorCode.value = opened.error.code; continue }
-    documents.open(opened.data)
-    if (!windowSession.tabIds.includes(opened.data.documentId)) windowSession.tabIds.push(opened.data.documentId)
-    windowSession.activeDocumentId = opened.data.documentId
+    activateOpenedDocument(opened.data)
   }
   lastCommand.value = `${result.data.length} document selection(s) processed`
 }
 
 
+
+function activateOpenedDocument(document: OpenDocumentDTO, anchor?: string): void {
+  documents.open(document)
+  if (!windowSession.tabIds.includes(document.documentId)) windowSession.tabIds.push(document.documentId)
+  windowSession.activeDocumentId = document.documentId
+  pendingPreviewAnchor.value = anchor ?? null
+}
+
+function activateExistingDocument(documentId: string, anchor?: string): void {
+  if (!documents.sessions[documentId]) return
+  windowSession.activeDocumentId = documentId
+  pendingPreviewAnchor.value = anchor ?? null
+}
 
 async function inspectConflict(): Promise<void> {
   const session = activeDocument.value
@@ -199,7 +212,7 @@ onBeforeUnmount(() => {
 <template>
   <main class="shell">
     <section class="card">
-      <p class="eyebrow">MarkHere • Issue 3</p>
+      <p class="eyebrow">MarkHere • Issue 4</p>
       <h1>{{ surface }}</h1>
       <p>
         The renderer is sandboxed and receives only the reviewed
@@ -234,6 +247,17 @@ onBeforeUnmount(() => {
         <button type="button" @click="testSafeLink">Open Electron Docs</button>
         <button type="button" @click="window.markhere.app.openSettings()">Settings</button>
       </div>
+      <PreviewPane
+        v-if="activeDocument"
+        :document-id="activeDocument.id"
+        :markdown="activeDocument.buffer.markdown"
+        :revision="activeDocument.buffer.revision"
+        :resource-scope-id="activeDocument.resourceScope.documentResourceScopeId"
+        :requested-anchor="pendingPreviewAnchor"
+        @opened-document="activateOpenedDocument"
+        @activate-existing-document="activateExistingDocument"
+        @anchor-consumed="pendingPreviewAnchor = null"
+      />
     </section>
   </main>
 </template>

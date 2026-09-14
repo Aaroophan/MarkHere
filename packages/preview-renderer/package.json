@@ -1,0 +1,26 @@
+{
+  "name": "@markhere/preview-renderer",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "type": "module",
+  "description": "Sandboxed-browser Markdown preview rendering, sanitization, diagrams, math, and syntax highlighting",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@markhere/markdown-engine": "workspace:*",
+    "dompurify": "3.4.15",
+    "katex": "0.18.0",
+    "mermaid": "11.15.0",
+    "prismjs": "1.30.0"
+  },
+  "devDependencies": {
+    "@types/prismjs": "1.26.6"
+  }
+}

@@ -25,6 +25,8 @@ import { registerIpcHandlers } from './ipc/register-ipc'
 import { ApplicationCommandRegistry } from './commands/command-registry'
 import { installApplicationMenu } from './commands/application-menu'
 import { maybeWriteSecurityProbe } from './security/security-probe'
+import { ResourceCapabilityBroker } from './resources/resource-capability-broker'
+import { ResourceService } from './resources/resource-service'
 
 registerPrivilegedSchemes()
 app.enableSandbox()
@@ -36,12 +38,14 @@ const ownsSingleInstance = lifecycle.initializeEarly()
 
 async function boot(): Promise<void> {
   await app.whenReady()
-  installAppProtocolHandlers()
 
   const trusted = new TrustedWebContentsRegistry()
   const capabilities = new CapabilityOwnershipRegistry()
   const selections = new SelectionTokenStore()
   const fileCapabilities = new FileCapabilityRegistry(capabilities)
+  const resourceBroker = new ResourceCapabilityBroker(capabilities)
+  const resources = new ResourceService(fileCapabilities, selections, resourceBroker)
+  installAppProtocolHandlers(undefined, resourceBroker)
   const recovery = new RecoveryService()
   const recents = new RecentDocumentStore()
   const sessionPersistence = new SessionPersistenceService()
@@ -60,7 +64,7 @@ async function boot(): Promise<void> {
       detectedAt: new Date().toISOString()
     })
   })
-  const files = new FileService({ selections, files: fileCapabilities, watch, recents, onSaved: async (documentId, revision) => {
+  const files = new FileService({ selections, files: fileCapabilities, watch, recents, resources: resourceBroker, onSaved: async (documentId, revision) => {
     await recovery.discardForDocument(documentId, revision)
   } })
   let commands: ApplicationCommandRegistry | undefined
@@ -102,6 +106,7 @@ async function boot(): Promise<void> {
     onRendererReady: (webContentsId) => lifecycle.markRendererReady(webContentsId),
     onWindowDestroyed: (webContentsId) => {
       selections.revokeAllForWebContents(webContentsId)
+      resourceBroker.revokeAllForWebContents(webContentsId)
       for (const documentId of fileCapabilities.revokeAllForWebContents(webContentsId)) watch.unwatchDocument(documentId)
       commands?.clearContext(webContentsId)
       void sessionPersistence.save(windows.snapshotPersistedWindows())
@@ -132,6 +137,7 @@ async function boot(): Promise<void> {
     shell: new ShellService(),
     clipboard: new ClipboardService(),
     files,
+    resources,
     recovery,
     future: new FutureService()
   })

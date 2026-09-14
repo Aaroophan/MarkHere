@@ -3,7 +3,7 @@
   "version": "0.1.0-alpha.0",
   "private": true,
   "type": "module",
-  "description": "Process-neutral Markdown capability/dialect contracts",
+  "description": "Process-neutral MarkHere Markdown parser, dialect registry, and preview token renderer",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -13,6 +13,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@markhere/shared": "workspace:*"
+    "@markhere/shared": "workspace:*",
+    "markdown-it": "15.0.2"
   }
 }
