@@ -50,6 +50,12 @@ export interface MarkdownNode {
   readonly children?: readonly MarkdownNode[]
 }
 
+export interface MarkdownStructureBlock {
+  readonly blockId: string
+  readonly sourceRange: MarkdownSourceRange
+  readonly headingSlug?: string
+}
+
 export interface MarkdownHeading {
   readonly level: number
   readonly text: string
@@ -100,6 +106,7 @@ export interface MarkdownParseResult {
   readonly sourceLength: number
   readonly tree: readonly MarkdownNode[]
   readonly headings: readonly MarkdownHeading[]
+  readonly structure: readonly MarkdownStructureBlock[]
   readonly resources: readonly MarkdownResourceReference[]
   readonly diagnostics: readonly MarkdownDiagnostic[]
   readonly featureUsage: MarkdownFeatureUsage
@@ -112,6 +119,7 @@ export interface MarkdownRenderResult {
   /** Intentionally unsanitized. Only PreviewRenderer may insert after DOMPurify. */
   readonly unsafeHtml: string
   readonly headings: readonly MarkdownHeading[]
+  readonly structure: readonly MarkdownStructureBlock[]
   readonly diagnostics: readonly MarkdownDiagnostic[]
   readonly featureUsage: MarkdownFeatureUsage
 }

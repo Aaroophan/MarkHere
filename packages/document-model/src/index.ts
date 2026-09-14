@@ -56,12 +56,61 @@ export interface DocumentBuffer {
   readonly lastMutation: MutationMetadata | null
 }
 
+export interface TextPosition {
+  readonly line: number
+  readonly column: number
+  readonly offset?: number
+}
+
+export interface TextRange {
+  readonly anchor: TextPosition
+  readonly head: TextPosition
+}
+
+export interface StructuralAnchor {
+  readonly blockId?: string
+  readonly headingSlug?: string
+  readonly sourceLine?: number
+  readonly sourceOffset?: number
+  readonly intraBlockRatio?: number
+}
+
+export interface SourceViewState {
+  readonly wrap: boolean
+  readonly cursor?: TextPosition
+  readonly selection?: TextRange
+  readonly scrollTop?: number
+  readonly structuralAnchor?: StructuralAnchor
+}
+
+export interface WysiwygViewState {
+  readonly focusMode: boolean
+  readonly typewriterMode: boolean
+  /** Adapter-owned, opaque bookmark. Never canonical document content. */
+  readonly selectionBookmark?: unknown
+  readonly scrollAnchor?: StructuralAnchor
+}
+
+export interface PreviewViewState {
+  readonly renderedRevision: number | null
+  readonly renderStatus: 'idle' | 'rendering' | 'ready' | 'error'
+  readonly scrollAnchor?: StructuralAnchor
+}
+
+export interface SplitViewState {
+  readonly ratio: number
+  readonly syncScroll: boolean
+  readonly sourceSide: 'left' | 'right'
+  readonly pendingPreviewRevision?: number
+  readonly scrollAnchor?: StructuralAnchor
+}
+
 export interface DocumentViewState {
   readonly mode: DocumentMode
-  readonly source: { readonly wrap: boolean; readonly scrollTop?: number }
-  readonly wysiwyg: { readonly focusMode: boolean; readonly typewriterMode: boolean }
-  readonly preview: { readonly renderedRevision: number | null; readonly renderStatus: 'idle' | 'rendering' | 'ready' | 'error' }
-  readonly split: { readonly ratio: number; readonly syncScroll: boolean; readonly sourceSide: 'left' | 'right'; readonly pendingPreviewRevision?: number }
+  readonly source: SourceViewState
+  readonly wysiwyg: WysiwygViewState
+  readonly preview: PreviewViewState
+  readonly split: SplitViewState
 }
 
 export interface DocumentConflict {
@@ -115,7 +164,7 @@ export class StaleDocumentRevisionError extends Error {
   }
 }
 
-export function createInitialViewState(mode: DocumentMode = 'wysiwyg'): DocumentViewState {
+export function createInitialViewState(mode: DocumentMode = 'preview'): DocumentViewState {
   return {
     mode,
     source: { wrap: true },
@@ -134,6 +183,7 @@ export function createLoadedDocumentSession(input: {
   fingerprint: FileFingerprint
   resourceScopeId: string
   openedAt?: string
+  mode?: DocumentMode
 }): DocumentSession {
   const now = input.openedAt ?? new Date().toISOString()
   return freezeSession({
@@ -141,7 +191,7 @@ export function createLoadedDocumentSession(input: {
     title: input.title,
     file: input.file,
     buffer: buffer(input.markdown, 1, 1, input.textFormat, input.fingerprint, null),
-    view: createInitialViewState(),
+    view: createInitialViewState(input.mode),
     conflict: null,
     recovery: emptyRecoveryState(),
     resourceScope: { documentResourceScopeId: input.resourceScopeId, workspaceId: null, remoteImages: 'block' },
@@ -157,6 +207,7 @@ export function createUntitledDocumentSession(input: {
   markdown?: string
   textFormat?: TextFormatMetadata
   openedAt?: string
+  mode?: DocumentMode
 }): DocumentSession {
   const now = input.openedAt ?? new Date().toISOString()
   const textFormat = input.textFormat ?? { encoding: 'utf8', lineEnding: 'lf', hasFinalNewline: false, bom: false }
@@ -165,7 +216,7 @@ export function createUntitledDocumentSession(input: {
     title: input.title ?? 'Untitled',
     file: null,
     buffer: buffer(input.markdown ?? '', 1, 0, textFormat, null, null),
-    view: createInitialViewState(),
+    view: createInitialViewState(input.mode),
     conflict: null,
     recovery: emptyRecoveryState(),
     resourceScope: { documentResourceScopeId: null, workspaceId: null, remoteImages: 'block' },
@@ -255,6 +306,39 @@ export function clearDocumentConflictKeepingLocal(session: DocumentSession): Doc
 
 export function updateRecoveryState(session: DocumentSession, recovery: RecoveryState): DocumentSession {
   return freezeSession({ ...session, recovery: Object.freeze({ ...recovery }) })
+}
+
+export function updateDocumentViewState(
+  session: DocumentSession,
+  updater: (current: DocumentViewState) => DocumentViewState
+): DocumentSession {
+  const next = updater(session.view)
+  return freezeSession({ ...session, view: Object.freeze({ ...next }) })
+}
+
+export function setDocumentMode(session: DocumentSession, mode: DocumentMode): DocumentSession {
+  if (session.view.mode === mode) return session
+  return updateDocumentViewState(session, (view) => ({ ...view, mode }))
+}
+
+export function updateSourceViewState(session: DocumentSession, patch: Partial<SourceViewState>): DocumentSession {
+  return updateDocumentViewState(session, (view) => ({ ...view, source: Object.freeze({ ...view.source, ...patch }) }))
+}
+
+export function updateWysiwygViewState(session: DocumentSession, patch: Partial<WysiwygViewState>): DocumentSession {
+  return updateDocumentViewState(session, (view) => ({ ...view, wysiwyg: Object.freeze({ ...view.wysiwyg, ...patch }) }))
+}
+
+export function updatePreviewViewState(session: DocumentSession, patch: Partial<PreviewViewState>): DocumentSession {
+  return updateDocumentViewState(session, (view) => ({ ...view, preview: Object.freeze({ ...view.preview, ...patch }) }))
+}
+
+export function updateSplitViewState(session: DocumentSession, patch: Partial<SplitViewState>): DocumentSession {
+  const ratio = patch.ratio === undefined ? session.view.split.ratio : Math.min(0.85, Math.max(0.15, patch.ratio))
+  return updateDocumentViewState(session, (view) => ({
+    ...view,
+    split: Object.freeze({ ...view.split, ...patch, ratio })
+  }))
 }
 
 function emptyRecoveryState(): RecoveryState {

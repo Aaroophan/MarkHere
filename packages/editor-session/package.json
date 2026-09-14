@@ -1,0 +1,16 @@
+{
+  "name": "@markhere/editor-session",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "type": "module",
+  "description": "Four-mode editor orchestration and structural navigation contracts",
+  "exports": { ".": "./src/index.ts" },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@markhere/document-model": "workspace:*"
+  }
+}

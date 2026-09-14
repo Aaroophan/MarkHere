@@ -54,6 +54,7 @@ export class FileService {
   readonly #recents: RecentDocumentStore
   readonly #resources: ResourceCapabilityBroker
   readonly #onSaved?: (documentId: string, throughRevision: number) => Promise<void>
+  readonly #onOpened?: (ownerWebContentsId: number, writable: boolean) => void
 
   constructor(options: {
     selections: SelectionTokenStore
@@ -62,6 +63,7 @@ export class FileService {
     recents: RecentDocumentStore
     resources: ResourceCapabilityBroker
     onSaved?: (documentId: string, throughRevision: number) => Promise<void>
+    onOpened?: (ownerWebContentsId: number, writable: boolean) => void
   }) {
     this.#selections = options.selections
     this.#files = options.files
@@ -69,6 +71,7 @@ export class FileService {
     this.#recents = options.recents
     this.#resources = options.resources
     this.#onSaved = options.onSaved
+    this.#onOpened = options.onOpened
   }
 
   async openSelected(selectionToken: string, ownerWebContentsId: number, openedVia: OpenedVia = 'dialog'): Promise<ApiResult<OpenDocumentDTO>> {
@@ -105,6 +108,7 @@ export class FileService {
     this.#runtime.set(documentId, { documentId, ownerWebContentsId, persistedRevision: 1, fingerprint })
     this.#watch.watchDocument(documentId, identity.canonicalPath)
     await this.#recents.add(path)
+    this.#onOpened?.(ownerWebContentsId, writable)
     return ok({
       documentId,
       displayPath: path,

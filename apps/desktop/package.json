@@ -24,7 +24,10 @@
     "chokidar": "5.0.0",
     "iconv-lite": "0.7.3",
     "pinia": "3.0.4",
-    "vue": "3.5.38"
+    "vue": "3.5.38",
+    "@markhere/editor-core": "workspace:*",
+    "@markhere/editor-session": "workspace:*",
+    "@markhere/source-editor": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "22.20.2",

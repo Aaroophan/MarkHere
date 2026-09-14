@@ -29,6 +29,7 @@ import type { FutureService } from '../services/future-service'
 import type { FileService } from '../documents/file-service'
 import type { RecoveryService } from '../storage/recovery-service'
 import type { ResourceService } from '../resources/resource-service'
+import type { SettingsService } from '../storage/settings-service'
 import type { SelectionTokenKind, SelectionTokenStore } from '../services/selection-token-store'
 import { failure } from '../services/api-results'
 import { registerValidatedInvoke, registerValidatedSend } from './validated-ipc'
@@ -45,6 +46,7 @@ export interface IpcServices {
   readonly files: FileService
   readonly resources: ResourceService
   readonly recovery: RecoveryService
+  readonly settings: SettingsService
   readonly future: FutureService
 }
 
@@ -157,9 +159,9 @@ export function registerIpcHandlers(services: IpcServices): void {
     try { services.resources.invalidateDocumentCache(documentId, sender.webContentsId) } catch { /* fail closed */ }
   })
 
-  registerValidatedInvoke(trusted, CHANNELS.settingsGet, () => services.future.unavailable<MarkHereSettings>('settings.get'))
-  registerValidatedInvoke(trusted, CHANNELS.settingsUpdate, () => services.future.unavailable<MarkHereSettings>('settings.update'))
-  registerValidatedInvoke(trusted, CHANNELS.settingsReset, () => services.future.unavailable<MarkHereSettings>('settings.reset'))
+  registerValidatedInvoke(trusted, CHANNELS.settingsGet, () => services.settings.get())
+  registerValidatedInvoke(trusted, CHANNELS.settingsUpdate, (_event, _sender, patch) => services.settings.update(patch))
+  registerValidatedInvoke(trusted, CHANNELS.settingsReset, (_event, _sender, section) => services.settings.reset(section))
   registerValidatedInvoke(trusted, CHANNELS.settingsGetKeybindings, () => services.future.unavailable<KeybindingConfig>('settings.getKeybindings'))
   registerValidatedInvoke(trusted, CHANNELS.settingsUpdateKeybindings, () => services.future.unavailable<KeybindingConfig>('settings.updateKeybindings'))
 

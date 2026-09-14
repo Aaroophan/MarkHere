@@ -3,7 +3,7 @@
   "version": "0.1.0-alpha.0",
   "private": true,
   "type": "module",
-  "description": "WYSIWYG adapter boundary reserved for attributable Muya-derived code",
+  "description": "MarkHere WYSIWYG adapter boundary over the MIT-licensed Muya editor engine",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@markhere/document-model": "workspace:*",
+    "@markhere/editor-session": "workspace:*",
     "@markhere/markdown-engine": "workspace:*",
-    "@markhere/shared": "workspace:*"
+    "@markhere/shared": "workspace:*",
+    "@muyajs/core": "0.2.0"
   }
 }

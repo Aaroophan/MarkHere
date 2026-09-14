@@ -27,6 +27,7 @@ import { installApplicationMenu } from './commands/application-menu'
 import { maybeWriteSecurityProbe } from './security/security-probe'
 import { ResourceCapabilityBroker } from './resources/resource-capability-broker'
 import { ResourceService } from './resources/resource-service'
+import { SettingsService } from './storage/settings-service'
 
 registerPrivilegedSchemes()
 app.enableSandbox()
@@ -47,6 +48,7 @@ async function boot(): Promise<void> {
   const resources = new ResourceService(fileCapabilities, selections, resourceBroker)
   installAppProtocolHandlers(undefined, resourceBroker)
   const recovery = new RecoveryService()
+  const settings = new SettingsService()
   const recents = new RecentDocumentStore()
   const sessionPersistence = new SessionPersistenceService()
   const closeCoordinator = new CloseCoordinator()
@@ -64,10 +66,12 @@ async function boot(): Promise<void> {
       detectedAt: new Date().toISOString()
     })
   })
-  const files = new FileService({ selections, files: fileCapabilities, watch, recents, resources: resourceBroker, onSaved: async (documentId, revision) => {
-    await recovery.discardForDocument(documentId, revision)
-  } })
   let commands: ApplicationCommandRegistry | undefined
+  const files = new FileService({
+    selections, files: fileCapabilities, watch, recents, resources: resourceBroker,
+    onSaved: async (documentId, revision) => { await recovery.discardForDocument(documentId, revision) },
+    onOpened: (ownerWebContentsId, writable) => commands?.setContext(ownerWebContentsId, { hasDocument: true, canSave: writable, editable: true })
+  })
   const isDevelopment = process.env.NODE_ENV !== 'production'
 
   const windows = new WindowManager({
@@ -115,11 +119,10 @@ async function boot(): Promise<void> {
   lifecycle.attachWindowManager(windows)
 
   const persistSession = async (): Promise<void> => {
+    const currentSettings = await settings.get()
+    const defaultMode = currentSettings.ok ? currentSettings.data.defaultMode : 'preview'
     await sessionPersistence.save(windows.snapshotPersistedWindows((webContentsId) =>
-      fileCapabilities.listForWebContents(webContentsId).map((record) => ({
-        displayPath: record.path.displayPath,
-        mode: 'wysiwyg' as const
-      }))
+      fileCapabilities.listForWebContents(webContentsId).map((record) => ({ displayPath: record.path.displayPath, mode: defaultMode }))
     ))
   }
   const sessionTimer = setInterval(() => { void persistSession() }, 5_000)
@@ -139,6 +142,7 @@ async function boot(): Promise<void> {
     files,
     resources,
     recovery,
+    settings,
     future: new FutureService()
   })
 

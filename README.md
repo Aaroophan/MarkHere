@@ -10,6 +10,7 @@ This repository implements:
 - **Issue 2 — Build the Secure Electron Application Shell and Privileged API Boundary**
 - **Issue 3 — Implement the Canonical Document Model, Filesystem Lifecycle, Atomic Persistence, Conflicts, and Recovery**
 - **Issue 4 — Implement the Markdown Dialect, Parsing, Safe Rendering, Resource Broker, and Preview Pipeline**
+- **Issue 5 — Implement Source, WYSIWYG, Preview, and Split Editing as Four First-Class Modes**
 
 The 11 architecture documents in `docs/01-...` through `docs/11-...` are normative. `docs/12-implementation-plan,md` is the implementation backlog derived from them. When implementation and architecture disagree, resolve the architecture conflict explicitly rather than silently weakening a boundary.
 
@@ -50,6 +51,20 @@ See:
 - `docs/development/issue-04-implementation.md`
 - `docs/development/issue-04-validation.md`
 
+## Issue 5 four-mode editor model
+
+MarkHere now treats **Preview**, **WYSIWYG**, **Source**, and **Split** as first-class modes over one canonical revisioned Markdown buffer. A process-neutral `ModeController` serializes transitions, flushes same-frame edits before handoff, carries structural/caret navigation state, and falls back to Source if an editor surface cannot safely activate. It never stores a second copy of authoritative document text.
+
+Source mode is implemented with CodeMirror 6 behind `@markhere/source-editor`. Authoritative canonical revisions rebuild the private CodeMirror state so stale Source undo history cannot be replayed over reload/recovery/WYSIWYG content. WYSIWYG mode uses the published MIT-licensed `@muyajs/core` `0.2.0` package only through `@markhere/editor-core`; entry performs a conservative Markdown round-trip check and falls back to Source rather than silently normalizing unsupported syntax. Because the public Muya 0.2.0 API predates MarkText's newer source-mode handoff helpers, MarkHere carries one explicitly-provenanced compatibility module for source-coordinate selection mapping plus MarkHere-owned same-frame drain/synthetic undo-boundary logic.
+
+Split mode reuses the same Source adapter and the Issue-4 safe preview renderer. Scroll synchronization is structural (source line/block anchors), not percentage based, and the splitter ratio plus sync preference are versioned settings. Save and Save As flush the active editable adapter before the canonical session snapshot is sent to the main-process persistence service.
+
+See:
+
+- `docs/development/issue-05-implementation.md`
+- `docs/development/issue-05-validation.md`
+- `docs/provenance/MUYA_DEPENDENCY.md`
+
 ## Pinned development baseline
 
 - Node.js `22.16.0`
@@ -60,6 +75,7 @@ See:
 - Pinia `3.0.4`
 - electron-vite `5.0.0`
 - CodeMirror 6 packages owned by `@markhere/source-editor`
+- Muya `@muyajs/core` `0.2.0` behind `@markhere/editor-core`, plus the explicitly-provenanced MarkHere compatibility layer documented in `docs/provenance/MUYA_DEPENDENCY.md`
 - markdown-it `15.0.2`
 - DOMPurify `3.4.15`
 - Mermaid `11.15.0`
@@ -78,6 +94,7 @@ pnpm check:foundation
 pnpm check:secure-shell
 pnpm check:document-lifecycle
 pnpm check:markdown-preview
+pnpm check:editor-modes
 pnpm format:check
 pnpm lint
 pnpm typecheck
@@ -87,7 +104,7 @@ pnpm check:secure-shell:runtime
 pnpm dev
 ```
 
-> **Lockfile finalization:** the uploaded repository still does not contain a real `pnpm-lock.yaml`, and this implementation environment cannot reach the npm registry. No lockfile has been fabricated. On a network-enabled machine run `pnpm install`, `pnpm compliance`, and the full gate above, then commit the pnpm-generated lockfile and regenerated dependency notices/SBOM. CI deliberately fails while the lockfile is absent. See `docs/development/issue-04-validation.md`.
+> **Lockfile finalization:** the uploaded repository still does not contain a real `pnpm-lock.yaml`, and this implementation environment cannot reach the npm registry. No lockfile has been fabricated. On a network-enabled machine run `pnpm install`, `pnpm compliance`, and the full gate above, then commit the pnpm-generated lockfile and regenerated dependency notices/SBOM. CI deliberately fails while the lockfile is absent. See `docs/development/issue-05-validation.md`.
 
 ## Repository map
 
@@ -102,8 +119,9 @@ packages/document-model/    Process-neutral document identifiers/contracts
 packages/ipc-contract/      Bridge DTOs, channel maps, Zod runtime schemas
 packages/markdown-engine/   CommonMark/GFM/MarkHere parser and capability registry
 packages/preview-renderer/  Sanitized read-only preview, Mermaid, KaTeX, Prism, render coordinator
-packages/editor-core/       Reserved Muya-derived WYSIWYG boundary
-packages/source-editor/     CodeMirror 6 source-editor boundary
+packages/editor-session/    Four-mode orchestration; owns no canonical Markdown
+packages/editor-core/       Muya-backed WYSIWYG adapter boundary
+packages/source-editor/     CodeMirror 6 exact-source adapter boundary
 packages/export-core/       Process-neutral export contracts
 packages/export-*/          Format-specific exporter boundaries
 packages/security-core/     Pure URL/security policy helpers
@@ -120,6 +138,7 @@ pnpm check:foundation
 pnpm check:secure-shell
 pnpm check:document-lifecycle
 pnpm check:markdown-preview
+pnpm check:editor-modes
 pnpm graph:dependencies
 ```
 
@@ -141,7 +160,7 @@ The runtime probe performs the corresponding checks against a real Electron rend
 
 ## Provenance
 
-MarkHere is independent from MarkText. No copied/adapted MarkText/Muya source is present in the current tree. If future work selectively reuses upstream code, it must be marked with `@markhere-upstream`, recorded in `docs/provenance/provenance.json`, and retain the applicable upstream notice. See `THIRD_PARTY_NOTICES.md`.
+MarkHere is independent from MarkText. Issue 5 consumes the published MIT-licensed `@muyajs/core` `0.2.0` dependency behind a MarkHere adapter and contains one explicitly marked/provenanced adaptation of MarkText Muya's source-coordinate sentinel technique in `packages/editor-core/src/muya-v020-compat.ts`. That provenance is recorded in `docs/provenance/provenance.json` and `docs/provenance/MUYA_DEPENDENCY.md`; applicable MIT notices are retained under `docs/provenance/licenses/`. Any future copied/adapted upstream source must follow the same `@markhere-upstream` + manifest process. See `THIRD_PARTY_NOTICES.md`.
 
 ## License
 

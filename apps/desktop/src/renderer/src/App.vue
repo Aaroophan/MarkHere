@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import type { AppInfo, AppCommandEvent, OpenDocumentDTO, RecoverySummary, WindowStateEvent } from '@markhere/ipc-contract'
+import type { AppInfo, AppCommandEvent, MarkHereSettings, OpenDocumentDTO, RecoverySummary, WindowStateEvent } from '@markhere/ipc-contract'
+import type { DocumentMode } from '@markhere/document-model'
 import { RendererCommandRegistry } from './command-registry'
 import { useWindowSessionStore } from './window-session-store'
 import { useDocumentSessionStore } from './document-session-store'
-import PreviewPane from './components/PreviewPane.vue'
+import DocumentEditor from './components/DocumentEditor.vue'
 
 const appInfo = ref<AppInfo | null>(null)
 const errorCode = ref<string | null>(null)
@@ -14,6 +15,8 @@ const conflictDiskPreview = ref<string | null>(null)
 const pendingPreviewAnchor = ref<string | null>(null)
 const windowState = ref<WindowStateEvent>({ maximized: false, fullScreen: false, alwaysOnTop: false })
 const commandRegistry = new RendererCommandRegistry()
+const editor = ref<InstanceType<typeof DocumentEditor> | null>(null)
+const settings = ref<MarkHereSettings>({ revision: 1, appearance: 'system', defaultMode: 'preview', autosave: false, remoteResources: 'block', lineNumbers: true, splitRatio: 0.5, syncScroll: true })
 const windowSession = useWindowSessionStore()
 const documents = useDocumentSessionStore()
 const activeDocument = computed(() => windowSession.activeDocumentId ? documents.sessions[windowSession.activeDocumentId] ?? null : null)
@@ -22,22 +25,24 @@ const unsubscribers: Array<() => void> = []
 const surface = computed(() => new URLSearchParams(window.location.search).get('surface') === 'settings' ? 'Settings shell' : 'Editor shell')
 
 function registerFoundationCommands(): void {
-  const deferredCommands: AppCommandEvent['id'][] = [
-    'file.new',
-    'file.export.html', 'file.export.pdf', 'file.export.docx',
-    'view.mode.preview', 'view.mode.wysiwyg', 'view.mode.source', 'view.mode.split',
-    'edit.find', 'edit.replace'
+  const deferredCommands: AppCommandEvent['id'][] = ['file.new', 'file.export.html', 'file.export.pdf', 'file.export.docx']
+  for (const id of deferredCommands) unsubscribers.push(commandRegistry.register(id, (event) => { lastCommand.value = `${event.id} (${event.source}) — awaiting later issue` }))
+
+  const modeCommands: ReadonlyArray<readonly [AppCommandEvent['id'], DocumentMode]> = [
+    ['view.mode.preview', 'preview'], ['view.mode.wysiwyg', 'wysiwyg'], ['view.mode.source', 'source'], ['view.mode.split', 'split']
   ]
-  for (const id of deferredCommands) {
-    unsubscribers.push(commandRegistry.register(id, (event) => {
-      // The command IDs are stable now; document-aware behavior is connected
-      // by Issues 3-7 without creating parallel menu/toolbar code paths.
-      lastCommand.value = `${event.id} (${event.source}) — awaiting document services`
+  for (const [id, mode] of modeCommands) {
+    unsubscribers.push(commandRegistry.register(id, async (event) => {
+      lastCommand.value = `${event.id} (${event.source})`
+      await editor.value?.transition(mode)
     }))
   }
+  unsubscribers.push(commandRegistry.register('edit.find', (event) => { lastCommand.value = `${event.id} (${event.source})`; editor.value?.find() }))
+  unsubscribers.push(commandRegistry.register('edit.replace', (event) => { lastCommand.value = `${event.id} (${event.source})`; editor.value?.replace() }))
 
   unsubscribers.push(commandRegistry.register('file.save', async (event) => {
     lastCommand.value = `${event.id} (${event.source})`
+    await editor.value?.flushActiveEditable()
     const session = activeDocument.value
     if (!session?.file) return
     const result = await window.markhere.files.saveDocument({
@@ -57,6 +62,7 @@ function registerFoundationCommands(): void {
   }))
   unsubscribers.push(commandRegistry.register('file.saveAs', async (event) => {
     lastCommand.value = `${event.id} (${event.source})`
+    await editor.value?.flushActiveEditable()
     const session = activeDocument.value
     if (!session) return
     const target = await window.markhere.dialogs.chooseSaveDocument(session.file?.basename ?? 'Untitled.md')
@@ -89,6 +95,12 @@ function registerFoundationCommands(): void {
   }))
 }
 
+async function loadSettings(): Promise<void> {
+  const result = await window.markhere.settings.get()
+  if (result.ok) settings.value = result.data
+  else errorCode.value = result.error.code
+}
+
 async function loadInfo(): Promise<void> {
   const result = await window.markhere.app.getInfo()
   if (result.ok) appInfo.value = result.data
@@ -113,7 +125,7 @@ async function selectMarkdown(): Promise<void> {
 
 
 function activateOpenedDocument(document: OpenDocumentDTO, anchor?: string): void {
-  documents.open(document)
+  documents.open(document, settings.value.defaultMode)
   if (!windowSession.tabIds.includes(document.documentId)) windowSession.tabIds.push(document.documentId)
   windowSession.activeDocumentId = document.documentId
   pendingPreviewAnchor.value = anchor ?? null
@@ -134,6 +146,9 @@ async function inspectConflict(): Promise<void> {
 }
 
 async function reloadConflictFromDisk(): Promise<void> {
+  // Drain the active editor before the user explicitly replaces local state,
+  // so no same-frame Source/WYSIWYG mutation can land after the disk reload.
+  await editor.value?.flushActiveEditable()
   const session = activeDocument.value
   if (!session?.conflict) return
   const result = await window.markhere.files.reloadDocument(session.id)
@@ -143,6 +158,9 @@ async function reloadConflictFromDisk(): Promise<void> {
 }
 
 async function overwriteConflict(): Promise<void> {
+  // Overwrite is still a persistence action: it must snapshot the same
+  // canonical revision discipline as Save/Save As.
+  await editor.value?.flushActiveEditable()
   const session = activeDocument.value
   if (!session?.conflict || !session.file) return
   const stat = await window.markhere.files.statDocument(session.id)
@@ -200,6 +218,7 @@ onMounted(() => {
     }
     documents.handleExternalChange(event)
   }))
+  void loadSettings()
   void loadInfo()
   void loadRecoveries()
 })
@@ -212,7 +231,7 @@ onBeforeUnmount(() => {
 <template>
   <main class="shell">
     <section class="card">
-      <p class="eyebrow">MarkHere • Issue 4</p>
+      <p class="eyebrow">MarkHere • Issue 5</p>
       <h1>{{ surface }}</h1>
       <p>
         The renderer is sandboxed and receives only the reviewed
@@ -247,16 +266,18 @@ onBeforeUnmount(() => {
         <button type="button" @click="testSafeLink">Open Electron Docs</button>
         <button type="button" @click="window.markhere.app.openSettings()">Settings</button>
       </div>
-      <PreviewPane
+      <DocumentEditor
         v-if="activeDocument"
+        :key="activeDocument.id"
+        ref="editor"
         :document-id="activeDocument.id"
-        :markdown="activeDocument.buffer.markdown"
-        :revision="activeDocument.buffer.revision"
-        :resource-scope-id="activeDocument.resourceScope.documentResourceScopeId"
+        :settings="settings"
         :requested-anchor="pendingPreviewAnchor"
         @opened-document="activateOpenedDocument"
         @activate-existing-document="activateExistingDocument"
         @anchor-consumed="pendingPreviewAnchor = null"
+        @settings-changed="settings = $event"
+        @error="errorCode = $event"
       />
     </section>
   </main>

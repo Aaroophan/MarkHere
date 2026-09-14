@@ -87,14 +87,39 @@ export function installAppProtocolHandlers(
   // Electron uses only the last listener registered for a given webRequest
   // event, so future request policy must be composed into this gate rather
   // than registering another listener elsewhere.
+  const developmentOrigin = (() => {
+    try { return process.env.ELECTRON_RENDERER_URL ? new URL(process.env.ELECTRON_RENDERER_URL).origin : null }
+    catch { return null }
+  })()
   session.defaultSession.webRequest.onBeforeRequest(
-    { urls: [`${MARKHERE_IDENTITY.resourceProtocol}://*/*`] },
+    { urls: [`${MARKHERE_IDENTITY.resourceProtocol}://*/*`, 'file://*/*', 'http://*/*', 'https://*/*'] },
     (details, callback) => {
       const ownerWebContentsId = details.webContentsId
-      const allowed = details.resourceType === 'image' &&
-        typeof ownerWebContentsId === 'number' &&
-        !!resources?.ownsProtocolRequest(details.url, ownerWebContentsId)
-      callback({ cancel: !allowed })
+      if (details.url.startsWith(`${MARKHERE_IDENTITY.resourceProtocol}://`)) {
+        const allowed = details.resourceType === 'image' &&
+          typeof ownerWebContentsId === 'number' && ownerWebContentsId > 0 &&
+          !!resources?.ownsProtocolRequest(details.url, ownerWebContentsId)
+        callback({ cancel: !allowed })
+        return
+      }
+
+      // Local-first default: a Markdown/WYSIWYG renderer cannot turn an image,
+      // CSS URL, raw HTML, plugin DOM node, or raw file path into an implicit
+      // network/filesystem request. Local document assets must use the scoped
+      // markhere-resource:// broker. The dev Vite origin is the sole network
+      // exception required to load the renderer.
+      if (typeof ownerWebContentsId === 'number' && ownerWebContentsId > 0) {
+        if (details.url.startsWith('file:')) {
+          callback({ cancel: true })
+          return
+        }
+        try {
+          const target = new URL(details.url)
+          callback({ cancel: developmentOrigin === null || target.origin !== developmentOrigin })
+        } catch { callback({ cancel: true }) }
+        return
+      }
+      callback({ cancel: false })
     }
   )
 

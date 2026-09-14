@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { StructuralAnchor } from '@markhere/document-model'
 import type { OpenDocumentDTO } from '@markhere/ipc-contract'
 import {
   PreviewRenderCoordinator,
@@ -14,12 +15,15 @@ const props = defineProps<{
   revision: number
   resourceScopeId: string | null
   requestedAnchor?: string | null
+  fill?: boolean
 }>()
 
 const emit = defineEmits<{
   openedDocument: [document: OpenDocumentDTO, anchor?: string]
   activateExistingDocument: [documentId: string, anchor?: string]
   anchorConsumed: []
+  scrollAnchor: [anchor: StructuralAnchor]
+  rendered: [report: PreviewRenderReport]
 }>() 
 
 const root = ref<HTMLElement | null>(null)
@@ -74,6 +78,7 @@ function scheduleRender(): void {
       )
       if (!signal.aborted && request.revision === props.revision && request.documentId === props.documentId) {
         report.value = nextReport
+        emit('rendered', nextReport)
         consumeRequestedAnchor(true)
       }
     }
@@ -107,6 +112,20 @@ function consumeRequestedAnchor(consumeWhenMissing = false): void {
 
 watch(() => props.requestedAnchor, () => consumeRequestedAnchor(false))
 
+function captureStructuralAnchor(): StructuralAnchor {
+  return renderer?.captureStructuralAnchor() ?? { sourceLine: 0, intraBlockRatio: 0 }
+}
+
+function scrollToStructuralAnchor(anchor: StructuralAnchor): void {
+  renderer?.scrollToStructuralAnchor(anchor)
+}
+
+function onPreviewScroll(): void {
+  if (renderer) emit('scrollAnchor', renderer.captureStructuralAnchor())
+}
+
+defineExpose({ captureStructuralAnchor, scrollToStructuralAnchor })
+
 onBeforeUnmount(() => {
   coordinator.cancel()
   renderer?.destroy()
@@ -115,19 +134,21 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="preview-panel" aria-label="Read-only Markdown preview">
+  <section class="preview-panel" :class="{ fill }" aria-label="Read-only Markdown preview">
     <header class="preview-status">
       <span>Preview • revision {{ revision }}</span>
       <span>{{ renderStatus }}</span>
       <span v-if="report">{{ report.headings.length }} headings • {{ report.diagnostics.length }} diagnostics</span>
     </header>
-    <article ref="root" class="mh-preview" tabindex="0" aria-live="polite"></article>
+    <article ref="root" class="mh-preview" tabindex="0" aria-live="polite" @scroll.passive="onPreviewScroll"></article>
   </section>
 </template>
 
 <style scoped>
 .preview-panel { margin-top: 20px; border: 1px solid #303a50; border-radius: 12px; overflow: hidden; background: #fdfdfd; color: #1f2328; }
+.preview-panel.fill { margin-top: 0; height: min(62vh, 720px); border: 0; border-radius: 0; }
 .preview-status { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #d8dee8; background: #f2f4f8; color: #526075; font-size: 12px; }
 .mh-preview { min-height: 240px; max-height: 520px; overflow: auto; padding: 28px; outline: none; }
+.preview-panel.fill .mh-preview { max-height: none; height: calc(100% - 36px); }
 .mh-preview:focus-visible { box-shadow: inset 0 0 0 2px #3b82f6; }
 </style>

@@ -5,7 +5,8 @@ import {
   renderParsedMarkdown,
   type MarkdownDiagnostic,
   type MarkdownHeading,
-  type MarkdownFeatureUsage
+  type MarkdownFeatureUsage,
+  type MarkdownStructureBlock
 } from '@markhere/markdown-engine'
 import { highlightCodeElement } from './highlight'
 import { classifyPreviewImage } from './resource-url'
@@ -40,6 +41,7 @@ export interface PreviewRenderRequest {
 export interface PreviewRenderReport {
   readonly revision: number
   readonly headings: readonly MarkdownHeading[]
+  readonly structure: readonly MarkdownStructureBlock[]
   readonly diagnostics: readonly MarkdownDiagnostic[]
   readonly featureUsage: MarkdownFeatureUsage
   readonly renderedAt: number
@@ -251,10 +253,48 @@ export class PreviewRenderer {
     return Object.freeze({
       revision: request.revision,
       headings: rendered.headings,
+      structure: rendered.structure,
       diagnostics: Object.freeze(diagnostics),
       featureUsage: rendered.featureUsage,
       renderedAt: Date.now()
     })
+  }
+
+  captureStructuralAnchor(): import('@markhere/document-model').StructuralAnchor {
+    const scrollTop = this.#target.scrollTop
+    const blocks = [...this.#target.querySelectorAll<HTMLElement>('[data-mh-block-id][data-mh-source-start]')]
+    let chosen: HTMLElement | null = null
+    for (const block of blocks) {
+      if (block.offsetTop <= scrollTop + 8) chosen = block
+      else if (!chosen) { chosen = block; break }
+      else break
+    }
+    if (!chosen) return { sourceLine: 0, intraBlockRatio: 0 }
+    const start = Number(chosen.dataset.mhSourceStart ?? 0)
+    const ratio = chosen.offsetHeight > 0 ? Math.min(1, Math.max(0, (scrollTop - chosen.offsetTop) / chosen.offsetHeight)) : 0
+    return {
+      blockId: chosen.dataset.mhBlockId,
+      ...(chosen.dataset.mhHeading ? { headingSlug: chosen.dataset.mhHeading } : {}),
+      sourceLine: Number.isFinite(start) ? start : 0,
+      intraBlockRatio: ratio
+    }
+  }
+
+  scrollToStructuralAnchor(anchor: import('@markhere/document-model').StructuralAnchor): void {
+    let target: HTMLElement | null = null
+    if (anchor.blockId) target = this.#target.querySelector<HTMLElement>(`[data-mh-block-id="${CSS.escape(anchor.blockId)}"]`)
+    if (!target && anchor.headingSlug) target = this.#target.querySelector<HTMLElement>(`#${CSS.escape(anchor.headingSlug)}`)
+    if (!target && anchor.sourceLine !== undefined) {
+      const blocks = [...this.#target.querySelectorAll<HTMLElement>('[data-mh-source-start][data-mh-source-end]')]
+      target = blocks.find((block) => {
+        const start = Number(block.dataset.mhSourceStart)
+        const end = Number(block.dataset.mhSourceEnd)
+        return Number.isFinite(start) && Number.isFinite(end) && anchor.sourceLine! >= start && anchor.sourceLine! < end
+      }) ?? blocks.find((block) => Number(block.dataset.mhSourceStart) >= anchor.sourceLine!) ?? null
+    }
+    if (!target) return
+    const ratio = Math.min(1, Math.max(0, anchor.intraBlockRatio ?? 0))
+    this.#target.scrollTop = Math.max(0, target.offsetTop + target.offsetHeight * ratio)
   }
 
   destroy(): void {

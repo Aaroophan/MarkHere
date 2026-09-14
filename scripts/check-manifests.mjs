@@ -7,6 +7,20 @@ const roots = ['apps', 'packages']
 const manifests = []
 const violations = []
 
+const IMMUTABLE_GIT_SUBDIR = /^github:[^/#]+\/[^#]+#[0-9a-f]{40}&path:[^\s]+$/i
+const isExactExternalPin = (range) => {
+  if (typeof range !== 'string') return false
+  if (IMMUTABLE_GIT_SUBDIR.test(range)) return true
+  if (/\b(?:latest|next)\b/i.test(range)) return false
+  // Foundation dependencies are intentionally exact. Reject semver range
+  // operators/wildcards without treating ordinary package/host letters (e.g.
+  // the "x" in "marktext") as a wildcard.
+  if (/^[~^><=*]/.test(range) && !/^\d/.test(range)) return false
+  if (/[|*]/.test(range)) return false
+  if (/^[v]?\d+(?:\.\d+){2}(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(range)) return true
+  return false
+}
+
 for (const root of roots) {
   for (const ent of await readdir(join(repo, root), { withFileTypes: true })) {
     if (!ent.isDirectory()) continue
@@ -45,8 +59,8 @@ for (const { root, dir, manifest } of manifests) {
         if (!names.has(name) && !manifests.some((item) => item.manifest.name === name)) {
           violations.push(`${manifest.name} ${group}.${name}: references missing workspace package`)
         }
-      } else if (typeof range !== 'string' || /[~^*xX]|\b(?:latest|next)\b/.test(range)) {
-        violations.push(`${manifest.name} ${group}.${name}: external dependency must be exact, got '${range}'`)
+      } else if (!isExactExternalPin(range)) {
+        violations.push(`${manifest.name} ${group}.${name}: external dependency must be exact or an immutable Git-subdirectory pin, got '${range}'`)
       }
     }
   }
@@ -58,8 +72,8 @@ for (const [group, dependencies] of [
   ['devDependencies', rootManifest.devDependencies ?? {}]
 ]) {
   for (const [name, range] of Object.entries(dependencies)) {
-    if (typeof range !== 'string' || /[~^*xX]|\b(?:latest|next)\b/.test(range)) {
-      violations.push(`root ${group}.${name}: external dependency must be exact, got '${range}'`)
+    if (!isExactExternalPin(range)) {
+      violations.push(`root ${group}.${name}: external dependency must be exact or an immutable Git-subdirectory pin, got '${range}'`)
     }
   }
 }

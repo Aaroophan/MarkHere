@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import type { DocumentExternalChangeEvent, OpenDocumentDTO, RecoveryDocumentDTO, SaveDocumentResult } from '@markhere/ipc-contract'
-import type { DocumentId, DocumentSession, FileBinding } from '@markhere/document-model'
+import type { DocumentId, DocumentMode, DocumentSession, FileBinding, PreviewViewState, SourceViewState, SplitViewState, WysiwygViewState } from '@markhere/document-model'
 import {
   applyPersistedRevision,
   applyReload,
@@ -8,7 +8,12 @@ import {
   commitDocumentMutation,
   createLoadedDocumentSession,
   createUntitledDocumentSession,
-  enterDocumentConflict
+  enterDocumentConflict,
+  setDocumentMode,
+  updatePreviewViewState,
+  updateSourceViewState,
+  updateSplitViewState,
+  updateWysiwygViewState
 } from '@markhere/document-model'
 
 interface State { sessions: Record<string, DocumentSession> }
@@ -35,7 +40,7 @@ function scheduleRecovery(session: DocumentSession): void {
 export const useDocumentSessionStore = defineStore('documents', {
   state: (): State => ({ sessions: {} }),
   actions: {
-    open(dto: OpenDocumentDTO): DocumentSession {
+    open(dto: OpenDocumentDTO, mode: DocumentMode = 'preview'): DocumentSession {
       const file: FileBinding = {
         displayPath: dto.displayPath,
         capabilityId: dto.documentId,
@@ -52,7 +57,8 @@ export const useDocumentSessionStore = defineStore('documents', {
         file,
         textFormat: dto.textFormat,
         fingerprint: dto.fingerprint,
-        resourceScopeId: dto.resourceScopeId
+        resourceScopeId: dto.resourceScopeId,
+        mode
       })
       this.sessions[dto.documentId] = session
       return session
@@ -133,6 +139,21 @@ export const useDocumentSessionStore = defineStore('documents', {
       this.sessions[dto.documentId] = session
       scheduleRecovery(session)
       return session
+    },
+    setMode(documentId: string, mode: DocumentMode): void {
+      this.sessions[documentId] = setDocumentMode(this.getRequired(documentId), mode)
+    },
+    updateSourceView(documentId: string, patch: Partial<SourceViewState>): void {
+      this.sessions[documentId] = updateSourceViewState(this.getRequired(documentId), patch)
+    },
+    updateWysiwygView(documentId: string, patch: Partial<WysiwygViewState>): void {
+      this.sessions[documentId] = updateWysiwygViewState(this.getRequired(documentId), patch)
+    },
+    updatePreviewView(documentId: string, patch: Partial<PreviewViewState>): void {
+      this.sessions[documentId] = updatePreviewViewState(this.getRequired(documentId), patch)
+    },
+    updateSplitView(documentId: string, patch: Partial<SplitViewState>): void {
+      this.sessions[documentId] = updateSplitViewState(this.getRequired(documentId), patch)
     },
     getRequired(documentId: string): DocumentSession {
       const session = this.sessions[documentId]

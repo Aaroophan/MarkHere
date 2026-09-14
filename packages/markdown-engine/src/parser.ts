@@ -10,7 +10,8 @@ import type {
   MarkdownParseResult,
   MarkdownRenderResult,
   MarkdownResourceReference,
-  MarkdownSourceRange
+  MarkdownSourceRange,
+  MarkdownStructureBlock
 } from './types'
 
 const MAX_MARKDOWN_SOURCE_LENGTH = 32 * 1024 * 1024
@@ -160,6 +161,14 @@ function installTaskLists(md: ReturnType<typeof markdownit>): void {
   })
 }
 
+function structureHtmlAttrs(token: { attrGet(name: string): string | null }, escape: (value: string) => string): string {
+  const blockId = token.attrGet('data-mh-block-id')
+  const start = token.attrGet('data-mh-source-start')
+  const end = token.attrGet('data-mh-source-end')
+  if (!blockId || start === null || end === null) return ''
+  return ` data-mh-block-id="${escape(blockId)}" data-mh-source-start="${escape(start)}" data-mh-source-end="${escape(end)}"`
+}
+
 function installRendererRules(md: ReturnType<typeof markdownit>): void {
   const escape = md.utils.escapeHtml
   const defaultFence = md.renderer.rules.fence
@@ -167,7 +176,7 @@ function installRendererRules(md: ReturnType<typeof markdownit>): void {
   md.renderer.rules.front_matter = (tokens, index) => {
     const token = tokens[index]
     if (!token) return ''
-    return `<section class="mh-front-matter" data-mh-front-matter="true"><div class="mh-front-matter-label">Front matter</div><pre><code>${escape(token.content)}</code></pre></section>\n`
+    return `<section class="mh-front-matter" data-mh-front-matter="true"${structureHtmlAttrs(token, escape)}><div class="mh-front-matter-label">Front matter</div><pre><code>${escape(token.content)}</code></pre></section>\n`
   }
 
   md.renderer.rules.math_inline = (tokens, index) => {
@@ -180,7 +189,7 @@ function installRendererRules(md: ReturnType<typeof markdownit>): void {
   md.renderer.rules.math_block = (tokens, index) => {
     const token = tokens[index]
     return token
-      ? `<div class="mh-math mh-math-block" data-mh-math="block">${escape(token.content)}</div>\n`
+      ? `<div class="mh-math mh-math-block" data-mh-math="block"${structureHtmlAttrs(token, escape)}>${escape(token.content)}</div>\n`
       : ''
   }
 
@@ -194,11 +203,11 @@ function installRendererRules(md: ReturnType<typeof markdownit>): void {
     if (!token) return ''
     const language = token.info.trim().split(/\s+/u)[0] ?? ''
     if (MERMAID_LANGUAGE.test(token.info.trim())) {
-      return `<div class="mh-mermaid" data-mh-mermaid="true"><pre data-mh-mermaid-source="true">${escape(token.content)}</pre></div>\n`
+      return `<div class="mh-mermaid" data-mh-mermaid="true"${structureHtmlAttrs(token, escape)}><pre data-mh-mermaid-source="true">${escape(token.content)}</pre></div>\n`
     }
     const safeLanguage = escape(language)
     const languageClass = safeLanguage ? ` class="language-${safeLanguage}"` : ''
-    return `<pre class="mh-code-block" data-mh-code-language="${safeLanguage}"><code${languageClass}>${escape(token.content)}</code></pre>\n`
+    return `<pre class="mh-code-block" data-mh-code-language="${safeLanguage}"${structureHtmlAttrs(token, escape)}><code${languageClass}>${escape(token.content)}</code></pre>\n`
       || defaultFence?.(tokens, index, options, env, self)
       || ''
   }
@@ -206,7 +215,7 @@ function installRendererRules(md: ReturnType<typeof markdownit>): void {
   md.renderer.rules.code_block = (tokens, index) => {
     const token = tokens[index]
     return token
-      ? `<pre class="mh-code-block" data-mh-code-language=""><code>${escape(token.content)}</code></pre>\n`
+      ? `<pre class="mh-code-block" data-mh-code-language=""${structureHtmlAttrs(token, escape)}><code>${escape(token.content)}</code></pre>\n`
       : ''
   }
 
@@ -283,10 +292,12 @@ function collectMetadata(
   headings: MarkdownHeading[]
   resources: MarkdownResourceReference[]
   featureUsage: MarkdownFeatureUsage
+  structure: MarkdownStructureBlock[]
 } {
   const headings: MarkdownHeading[] = []
   const resources: MarkdownResourceReference[] = []
   const usage = emptyFeatureUsage()
+  const structure: MarkdownStructureBlock[] = []
   const slugger = new HeadingSlugger()
 
   const inspectInline = (
@@ -316,6 +327,13 @@ function collectMetadata(
     const token = tokens[index]
     if (!token) continue
     const range = tokenRange(token)
+    if (range && token.level === 0 && (token.nesting === 1 || ['fence', 'code_block', 'front_matter', 'math_block', 'html_block'].includes(token.type))) {
+      const blockId = `mh-b-${range.startLine}-${range.endLine}-${structure.length}`
+      token.attrSet('data-mh-block-id', blockId)
+      token.attrSet('data-mh-source-start', String(range.startLine))
+      token.attrSet('data-mh-source-end', String(range.endLine))
+      structure.push({ blockId, sourceRange: range })
+    }
     if (token.type === 'heading_open') {
       const inline = tokens[index + 1]
       const level = Number.parseInt(token.tag.slice(1), 10)
@@ -325,6 +343,11 @@ function collectMetadata(
       token.attrSet('data-mh-heading', slug)
       if (range) token.attrSet('data-mh-source-line', String(range.startLine))
       headings.push({ level, text, slug, ...(range ? { sourceRange: range } : {}) })
+      const blockId = token.attrGet('data-mh-block-id')
+      if (blockId) {
+        const idx = structure.findIndex((entry) => entry.blockId === blockId)
+        if (idx >= 0 && range) structure[idx] = { blockId, sourceRange: range, headingSlug: slug }
+      }
     } else if (token.type === 'table_open') usage.tables += 1
     else if (token.type === 'front_matter') usage.frontMatter += 1
     else if (token.type === 'math_block') usage.mathBlock += 1
@@ -343,7 +366,7 @@ function collectMetadata(
     diagnostics.push({ code: 'MD_FRONT_MATTER_MULTIPLE', severity: 'warning', message: 'Only leading front matter is treated as a MarkHere front-matter block.' })
   }
 
-  return { headings, resources, featureUsage: usage }
+  return { headings, structure, resources, featureUsage: usage }
 }
 
 export function parseMarkdown(input: MarkdownParseInput): MarkdownParseResult {
@@ -364,6 +387,7 @@ export function parseMarkdown(input: MarkdownParseInput): MarkdownParseResult {
       sourceLength: input.markdown.length,
       tree: Object.freeze([]),
       headings: Object.freeze([]),
+      structure: Object.freeze([]),
       resources: Object.freeze([]),
       diagnostics: Object.freeze(diagnostics),
       featureUsage: Object.freeze(emptyFeatureUsage()),
@@ -381,6 +405,7 @@ export function parseMarkdown(input: MarkdownParseInput): MarkdownParseResult {
       sourceLength: input.markdown.length,
       tree: Object.freeze(tokens.map((token) => tokenToNode(token))),
       headings: Object.freeze(metadata.headings),
+      structure: Object.freeze(metadata.structure),
       resources: Object.freeze(metadata.resources),
       diagnostics: Object.freeze(diagnostics),
       featureUsage: Object.freeze(metadata.featureUsage),
@@ -398,6 +423,7 @@ export function parseMarkdown(input: MarkdownParseInput): MarkdownParseResult {
       sourceLength: input.markdown.length,
       tree: Object.freeze([]),
       headings: Object.freeze([]),
+      structure: Object.freeze([]),
       resources: Object.freeze([]),
       diagnostics: Object.freeze(diagnostics),
       featureUsage: Object.freeze(emptyFeatureUsage()),
@@ -415,6 +441,7 @@ export function renderParsedMarkdown(result: MarkdownParseResult): MarkdownRende
       revision: result.revision,
       unsafeHtml: fallback,
       headings: result.headings,
+      structure: result.structure,
       diagnostics: result.diagnostics,
       featureUsage: result.featureUsage
     })
@@ -426,6 +453,7 @@ export function renderParsedMarkdown(result: MarkdownParseResult): MarkdownRende
     revision: result.revision,
     unsafeHtml,
     headings: result.headings,
+    structure: result.structure,
     diagnostics: result.diagnostics,
     featureUsage: result.featureUsage
   })
