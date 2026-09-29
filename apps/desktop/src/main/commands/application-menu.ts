@@ -16,7 +16,7 @@ export function installApplicationMenu(commands: ApplicationCommandRegistry): ()
         label: definition.label,
         ...(definition.accelerator ? { accelerator: definition.accelerator } : {}),
         enabled: commands.isEnabled(id, target),
-        click: () => { commands.dispatch(id, 'menu') }
+        click: () => { commands.dispatch(id, 'menu') } 
       }
     }
 
