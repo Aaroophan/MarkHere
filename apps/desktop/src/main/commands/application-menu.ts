@@ -69,7 +69,7 @@ export function installApplicationMenu(commands: ApplicationCommandRegistry): ()
           { role: 'togglefullscreen' }
         ]
       },
-      {
+      { 
         label: 'MarkHere',
         submenu: [commandItem('app.settings')]
       }
