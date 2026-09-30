@@ -35,7 +35,7 @@ export async function atomicReplaceFile(targetPath: string, bytes: Buffer, fault
         await rename(tempPath, targetPath)
         await safeUnlink(backupPath)
       } catch (replaceError) {
-        try { await rename(backupPath, targetPath) } catch { /* preserve primary failure */ }
+        try { await rename(backupPath, targetPath) } catch { /* preserve primary failure catch */ }
         throw replaceError
       }
     }
