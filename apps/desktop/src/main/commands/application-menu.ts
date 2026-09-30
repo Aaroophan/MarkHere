@@ -68,7 +68,7 @@ export function installApplicationMenu(commands: ApplicationCommandRegistry): ()
           { role: 'toggleDevTools', visible: process.env.NODE_ENV !== 'production' },
           { role: 'togglefullscreen' }
         ]
-      },
+      }, 
       {
         label: 'MarkHere',
         submenu: [commandItem('app.settings')]
