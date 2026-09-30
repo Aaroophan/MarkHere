@@ -72,7 +72,7 @@ export function installApplicationMenu(commands: ApplicationCommandRegistry): ()
       { 
         label: 'MarkHere',
         submenu: [commandItem('app.settings')]
-      }
+      } 
     ]
 
     Menu.setApplicationMenu(Menu.buildFromTemplate(template))
