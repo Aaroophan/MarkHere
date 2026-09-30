@@ -6,7 +6,7 @@ export type CommandCondition = 'always' | 'document' | 'saveable-document' | 'ed
 
 export interface CommandDefinition {
   readonly id: CommandId
-  readonly label: string
+  readonly label: string 
   readonly accelerator?: string
   readonly target: 'renderer' | 'main'
   readonly when: CommandCondition
