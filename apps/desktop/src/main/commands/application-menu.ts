@@ -2,10 +2,8 @@ import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'elect
 import type { CommandId } from '@markhere/ipc-contract'
 import type { ApplicationCommandRegistry } from './command-registry'
 
-/**
- * Native menus are a presentation of the command registry, never a second
- * behavior system. Issue 3 updates CommandContext when document state exists.
- */
+// Native menus are a presentation of the command registry, never a second behavior system. Issue 3 updates CommandContext when document state exists
+
 export function installApplicationMenu(commands: ApplicationCommandRegistry): () => void {
   const rebuild = (): void => {
     const target = BrowserWindow.getFocusedWindow()
@@ -58,7 +56,7 @@ export function installApplicationMenu(commands: ApplicationCommandRegistry): ()
         ]
       },
       {
-        label: 'View',
+        label: 'View', 
         submenu: [
           commandItem('view.mode.preview'),
           commandItem('view.mode.wysiwyg'),
