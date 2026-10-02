@@ -32,6 +32,9 @@ export const markhereBridge: MarkHereDesktopApi = Object.freeze({
   files: Object.freeze({
     openSelected: (selectionToken) => transport.invoke(CHANNELS.fileOpenSelected, selectionToken),
     reopenRecent: (recentId) => transport.invoke(CHANNELS.fileReopenRecent, recentId),
+    listRecent: () => transport.invoke(CHANNELS.fileListRecent),
+    removeRecent: (recentId) => transport.invoke(CHANNELS.fileRemoveRecent, recentId),
+    clearRecent: () => transport.invoke(CHANNELS.fileClearRecent),
     saveDocument: (request) => transport.invoke(CHANNELS.fileSave, request),
     saveDocumentAs: (request) => transport.invoke(CHANNELS.fileSaveAs, request),
     statDocument: (documentId) => transport.invoke(CHANNELS.fileStat, documentId),
@@ -43,6 +46,10 @@ export const markhereBridge: MarkHereDesktopApi = Object.freeze({
   }),
   workspaces: Object.freeze({
     open: (selectionToken) => transport.invoke(CHANNELS.workspaceOpen, selectionToken),
+    reopenRecent: (recentId) => transport.invoke(CHANNELS.workspaceReopenRecent, recentId),
+    listRecent: () => transport.invoke(CHANNELS.workspaceListRecent),
+    removeRecent: (recentId) => transport.invoke(CHANNELS.workspaceRemoveRecent, recentId),
+    clearRecent: () => transport.invoke(CHANNELS.workspaceClearRecent),
     close: (workspaceId) => transport.invoke(CHANNELS.workspaceClose, workspaceId),
     list: (request) => transport.invoke(CHANNELS.workspaceList, request),
     createFile: (request) => transport.invoke(CHANNELS.workspaceCreateFile, request),
@@ -97,6 +104,10 @@ export const markhereBridge: MarkHereDesktopApi = Object.freeze({
   events: Object.freeze({
     onDocumentExternalChange: (callback) => transport.on(CHANNELS.eventDocumentExternalChange, callback),
     onWorkspaceChange: (callback) => transport.on(CHANNELS.eventWorkspaceChange, callback),
+    onWorkspaceSearchBatch: (callback) => transport.on(CHANNELS.eventWorkspaceSearchBatch, callback),
+    onWorkspaceSearchCompleted: (callback) => transport.on(CHANNELS.eventWorkspaceSearchCompleted, callback),
+    onSettingsChanged: (callback) => transport.on(CHANNELS.eventSettingsChanged, callback),
+    onKeybindingsChanged: (callback) => transport.on(CHANNELS.eventKeybindingsChanged, callback),
     onExportProgress: (callback) => transport.on(CHANNELS.eventExportProgress, callback),
     onExportCompleted: (callback) => transport.on(CHANNELS.eventExportCompleted, callback),
     onUpdateStatus: (callback) => transport.on(CHANNELS.eventUpdateStatus, callback),

@@ -5,10 +5,12 @@ export interface MarkHereSettings {
   readonly appearance: 'light' | 'dark' | 'system'
   readonly defaultMode: 'preview' | 'wysiwyg' | 'source' | 'split'
   readonly autosave: boolean
+  readonly autosaveDelayMs: number
   readonly remoteResources: 'block' | 'ask' | 'allow-https'
   readonly lineNumbers: boolean
   readonly splitRatio: number
   readonly syncScroll: boolean
+  readonly imageStorage: 'beside-document' | 'data-uri'
 }
 
 export type SettingsPatch = Partial<Omit<MarkHereSettings, 'revision'>> & {

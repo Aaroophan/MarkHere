@@ -66,7 +66,8 @@ export interface RenameDocumentRequest {
 
 export interface CopyImportedImageRequest {
   readonly documentId: string
-  readonly temporaryImageToken: string
+  readonly mimeType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
+  readonly bytes: Uint8Array
   readonly preferredName?: string
 }
 

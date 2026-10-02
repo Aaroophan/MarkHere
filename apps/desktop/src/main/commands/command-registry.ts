@@ -6,7 +6,7 @@ export type CommandCondition = 'always' | 'document' | 'saveable-document' | 'ed
 
 export interface CommandDefinition {
   readonly id: CommandId
-  readonly label: string 
+  readonly label: string
   readonly accelerator?: string
   readonly target: 'renderer' | 'main'
   readonly when: CommandCondition
@@ -18,11 +18,7 @@ export interface CommandContext {
   readonly editable: boolean
 }
 
-const EMPTY_CONTEXT: CommandContext = Object.freeze({
-  hasDocument: false,
-  canSave: false,
-  editable: false
-})
+const EMPTY_CONTEXT: CommandContext = Object.freeze({ hasDocument: false, canSave: false, editable: false })
 
 export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = Object.freeze([
   { id: 'file.new', label: 'New', accelerator: 'CmdOrCtrl+N', target: 'renderer', when: 'always' },
@@ -40,6 +36,7 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = Object.freeze([
   { id: 'edit.find', label: 'Find', accelerator: 'CmdOrCtrl+F', target: 'renderer', when: 'document' },
   { id: 'edit.replace', label: 'Replace', accelerator: 'CmdOrCtrl+H', target: 'renderer', when: 'editable-document' },
   { id: 'app.settings', label: 'Settings', accelerator: 'CmdOrCtrl+,', target: 'renderer', when: 'always' },
+  { id: 'app.commandPalette', label: 'Command Palette…', accelerator: 'CmdOrCtrl+Shift+P', target: 'renderer', when: 'always' },
   { id: 'app.quit', label: 'Quit', accelerator: 'CmdOrCtrl+Q', target: 'main', when: 'always' }
 ])
 
@@ -48,14 +45,29 @@ export class ApplicationCommandRegistry {
   readonly #onQuit: () => void
   readonly #contexts = new Map<number, CommandContext>()
   readonly #changeListeners = new Set<() => void>()
+  readonly #accelerators = new Map<CommandId, string>()
 
   constructor(events: RendererEventDispatcher, onQuit: () => void) {
     this.#events = events
     this.#onQuit = onQuit
+    for (const definition of COMMAND_DEFINITIONS) if (definition.accelerator) this.#accelerators.set(definition.id, definition.accelerator)
   }
 
   definition(id: CommandId): CommandDefinition | undefined {
-    return COMMAND_DEFINITIONS.find((definition) => definition.id === id)
+    const definition = COMMAND_DEFINITIONS.find((candidate) => candidate.id === id)
+    if (!definition) return undefined
+    const accelerator = this.#accelerators.get(id)
+    const { accelerator: _defaultAccelerator, ...base } = definition
+    return accelerator ? { ...base, accelerator } : base
+  }
+
+  setKeybindings(bindings: Readonly<Record<string, string>>): void {
+    this.#accelerators.clear()
+    for (const definition of COMMAND_DEFINITIONS) {
+      const accelerator = bindings[definition.id]
+      if (accelerator) this.#accelerators.set(definition.id, accelerator)
+    }
+    this.#emitChanged()
   }
 
   setContext(webContentsId: number, context: CommandContext): void {
@@ -98,7 +110,5 @@ export class ApplicationCommandRegistry {
     return true
   }
 
-  #emitChanged(): void {
-    for (const listener of this.#changeListeners) listener()
-  }
+  #emitChanged(): void { for (const listener of this.#changeListeners) listener() }
 }

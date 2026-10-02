@@ -8,12 +8,12 @@ import type {
   OpenDocumentDialogOptions
 } from './dto/dialogs'
 import type {
+  CopyImportedImageRequest,
   DocumentStatDTO,
   FileMutationResult,
   ImportedImageResult,
   OpenDocumentDTO,
   RenameDocumentRequest,
-  CopyImportedImageRequest,
   SaveDocumentAsRequest,
   SaveDocumentRequest,
   SaveDocumentResult
@@ -38,17 +38,22 @@ import type {
   ListWorkspaceRequest,
   MoveWorkspaceEntryRequest,
   OpenWorkspaceEntryRequest,
+  RecentItemDTO,
   RenameWorkspaceEntryRequest,
   SearchRequest,
   TrashWorkspaceEntryRequest,
   WorkspaceDTO,
-  WorkspaceEntry
+  WorkspaceEntry,
+  WorkspaceSearchBatchEvent,
+  WorkspaceSearchCompletedEvent
 } from './dto/workspace'
 import type {
   AppCommandEvent,
   DocumentExternalChangeEvent,
   ExportCompletedEvent,
   ExportProgressEvent,
+  KeybindingsChangedEvent,
+  SettingsChangedEvent,
   WindowStateEvent,
   WorkspaceChangeEvent
 } from './dto/events'
@@ -73,6 +78,9 @@ export const CHANNELS = Object.freeze({
   dialogsConfirm: 'mh:v1:dialogs:confirm',
   fileOpenSelected: 'mh:v1:file:open-selected',
   fileReopenRecent: 'mh:v1:file:reopen-recent',
+  fileListRecent: 'mh:v1:file:list-recent',
+  fileRemoveRecent: 'mh:v1:file:remove-recent',
+  fileClearRecent: 'mh:v1:file:clear-recent',
   fileSave: 'mh:v1:file:save',
   fileSaveAs: 'mh:v1:file:save-as',
   fileStat: 'mh:v1:file:stat',
@@ -82,6 +90,10 @@ export const CHANNELS = Object.freeze({
   fileRename: 'mh:v1:file:rename',
   fileCopyImportedImage: 'mh:v1:file:copy-imported-image',
   workspaceOpen: 'mh:v1:workspace:open',
+  workspaceReopenRecent: 'mh:v1:workspace:reopen-recent',
+  workspaceListRecent: 'mh:v1:workspace:list-recent',
+  workspaceRemoveRecent: 'mh:v1:workspace:remove-recent',
+  workspaceClearRecent: 'mh:v1:workspace:clear-recent',
   workspaceClose: 'mh:v1:workspace:close',
   workspaceList: 'mh:v1:workspace:list',
   workspaceCreateFile: 'mh:v1:workspace:create-file',
@@ -119,6 +131,10 @@ export const CHANNELS = Object.freeze({
   updateGetStatus: 'mh:v1:update:get-status',
   eventDocumentExternalChange: 'mh:v1:event:document-external-change',
   eventWorkspaceChange: 'mh:v1:event:workspace-change',
+  eventWorkspaceSearchBatch: 'mh:v1:event:workspace-search-batch',
+  eventWorkspaceSearchCompleted: 'mh:v1:event:workspace-search-completed',
+  eventSettingsChanged: 'mh:v1:event:settings-changed',
+  eventKeybindingsChanged: 'mh:v1:event:keybindings-changed',
   eventExportProgress: 'mh:v1:event:export-progress',
   eventExportCompleted: 'mh:v1:event:export-completed',
   eventUpdateStatus: 'mh:v1:event:update-status',
@@ -135,25 +151,16 @@ export interface InvokeChannelMap {
   [CHANNELS.windowIsMaximized]: { args: []; result: ApiResult<boolean> }
   [CHANNELS.windowIsFullScreen]: { args: []; result: ApiResult<boolean> }
   [CHANNELS.windowSetAlwaysOnTop]: { args: [enabled: boolean]; result: ApiResult<void> }
-  [CHANNELS.dialogsOpenDocuments]: {
-    args: [options?: OpenDocumentDialogOptions]
-    result: ApiResult<SelectedPath[]>
-  }
+  [CHANNELS.dialogsOpenDocuments]: { args: [options?: OpenDocumentDialogOptions]; result: ApiResult<SelectedPath[]> }
   [CHANNELS.dialogsOpenWorkspace]: { args: []; result: ApiResult<SelectedPath | null> }
-  [CHANNELS.dialogsChooseSaveDocument]: {
-    args: [defaultName?: string]
-    result: ApiResult<SelectedPath | null>
-  }
-  [CHANNELS.dialogsChooseExportTarget]: {
-    args: [request: ExportTargetDialogRequest]
-    result: ApiResult<SelectedPath | null>
-  }
-  [CHANNELS.dialogsConfirm]: {
-    args: [request: ConfirmDialogRequest]
-    result: ApiResult<ConfirmDialogResult>
-  }
+  [CHANNELS.dialogsChooseSaveDocument]: { args: [defaultName?: string]; result: ApiResult<SelectedPath | null> }
+  [CHANNELS.dialogsChooseExportTarget]: { args: [request: ExportTargetDialogRequest]; result: ApiResult<SelectedPath | null> }
+  [CHANNELS.dialogsConfirm]: { args: [request: ConfirmDialogRequest]; result: ApiResult<ConfirmDialogResult> }
   [CHANNELS.fileOpenSelected]: { args: [selectionToken: string]; result: ApiResult<OpenDocumentDTO> }
   [CHANNELS.fileReopenRecent]: { args: [recentId: string]; result: ApiResult<OpenDocumentDTO> }
+  [CHANNELS.fileListRecent]: { args: []; result: ApiResult<RecentItemDTO[]> }
+  [CHANNELS.fileRemoveRecent]: { args: [recentId: string]; result: ApiResult<void> }
+  [CHANNELS.fileClearRecent]: { args: []; result: ApiResult<void> }
   [CHANNELS.fileSave]: { args: [request: SaveDocumentRequest]; result: ApiResult<SaveDocumentResult> }
   [CHANNELS.fileSaveAs]: { args: [request: SaveDocumentAsRequest]; result: ApiResult<SaveDocumentResult> }
   [CHANNELS.fileStat]: { args: [documentId: string]; result: ApiResult<DocumentStatDTO> }
@@ -163,6 +170,10 @@ export interface InvokeChannelMap {
   [CHANNELS.fileRename]: { args: [request: RenameDocumentRequest]; result: ApiResult<FileMutationResult> }
   [CHANNELS.fileCopyImportedImage]: { args: [request: CopyImportedImageRequest]; result: ApiResult<ImportedImageResult> }
   [CHANNELS.workspaceOpen]: { args: [selectionToken: string]; result: ApiResult<WorkspaceDTO> }
+  [CHANNELS.workspaceReopenRecent]: { args: [recentId: string]; result: ApiResult<WorkspaceDTO> }
+  [CHANNELS.workspaceListRecent]: { args: []; result: ApiResult<RecentItemDTO[]> }
+  [CHANNELS.workspaceRemoveRecent]: { args: [recentId: string]; result: ApiResult<void> }
+  [CHANNELS.workspaceClearRecent]: { args: []; result: ApiResult<void> }
   [CHANNELS.workspaceClose]: { args: [workspaceId: string]; result: ApiResult<void> }
   [CHANNELS.workspaceList]: { args: [request: ListWorkspaceRequest]; result: ApiResult<WorkspaceEntry[]> }
   [CHANNELS.workspaceCreateFile]: { args: [request: CreateWorkspaceFileRequest]; result: ApiResult<FileMutationResult> }
@@ -183,10 +194,7 @@ export interface InvokeChannelMap {
   [CHANNELS.recoveryList]: { args: []; result: ApiResult<RecoverySummary[]> }
   [CHANNELS.recoveryGet]: { args: [snapshotId: string]; result: ApiResult<RecoveryDocumentDTO> }
   [CHANNELS.recoveryDiscard]: { args: [snapshotId: string]; result: ApiResult<void> }
-  [CHANNELS.recoveryDiscardForDocument]: {
-    args: [documentId: string, throughRevision?: number]
-    result: ApiResult<void>
-  }
+  [CHANNELS.recoveryDiscardForDocument]: { args: [documentId: string, throughRevision?: number]; result: ApiResult<void> }
   [CHANNELS.exportStart]: { args: [request: StartExportRequest]; result: ApiResult<{ jobId: string }> }
   [CHANNELS.exportGetStatus]: { args: [jobId: string]; result: ApiResult<ExportJobDTO> }
   [CHANNELS.shellOpenExternal]: { args: [url: string]; result: ApiResult<void> }
@@ -213,6 +221,10 @@ export interface SendChannelMap {
 export interface MainEventChannelMap {
   [CHANNELS.eventDocumentExternalChange]: DocumentExternalChangeEvent
   [CHANNELS.eventWorkspaceChange]: WorkspaceChangeEvent
+  [CHANNELS.eventWorkspaceSearchBatch]: WorkspaceSearchBatchEvent
+  [CHANNELS.eventWorkspaceSearchCompleted]: WorkspaceSearchCompletedEvent
+  [CHANNELS.eventSettingsChanged]: SettingsChangedEvent
+  [CHANNELS.eventKeybindingsChanged]: KeybindingsChangedEvent
   [CHANNELS.eventExportProgress]: ExportProgressEvent
   [CHANNELS.eventExportCompleted]: ExportCompletedEvent
   [CHANNELS.eventUpdateStatus]: UpdateStatus

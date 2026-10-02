@@ -2,6 +2,8 @@ import type { ExportCompletedEvent, ExportProgressEvent } from './export'
 import type { UpdateStatus } from './update'
 import type { AppCommandEvent, WindowStateEvent } from './common'
 import type { FileFingerprint } from './files'
+import type { KeybindingConfig, MarkHereSettings } from './settings'
+import type { WorkspaceSearchBatchEvent, WorkspaceSearchCompletedEvent } from './workspace'
 
 export interface DocumentExternalChangeEvent {
   readonly documentId: string
@@ -16,10 +18,22 @@ export interface WorkspaceChangeEvent {
   readonly relativePath: string
 }
 
+export interface SettingsChangedEvent {
+  readonly settings: MarkHereSettings
+}
+
+export interface KeybindingsChangedEvent {
+  readonly config: KeybindingConfig
+}
+
 export type {
   AppCommandEvent,
   ExportCompletedEvent,
   ExportProgressEvent,
+  KeybindingConfig,
+  MarkHereSettings,
   UpdateStatus,
-  WindowStateEvent
+  WindowStateEvent,
+  WorkspaceSearchBatchEvent,
+  WorkspaceSearchCompletedEvent
 }

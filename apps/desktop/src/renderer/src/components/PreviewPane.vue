@@ -15,6 +15,7 @@ const props = defineProps<{
   revision: number
   resourceScopeId: string | null
   requestedAnchor?: string | null
+  allowRemoteHttpsImages?: boolean
   fill?: boolean
 }>()
 
@@ -36,14 +37,14 @@ let rendererKey = ''
 function createRenderer(): PreviewRenderer | null {
   const target = root.value
   if (!target) return null
-  const key = `${props.documentId}:${props.resourceScopeId ?? 'no-resource-scope'}`
+  const key = `${props.documentId}:${props.resourceScopeId ?? 'no-resource-scope'}:${props.allowRemoteHttpsImages ? 'remote' : 'local'}`
   if (renderer && rendererKey === key) return renderer
   renderer?.destroy()
   rendererKey = key
   renderer = new PreviewRenderer(target, {
     documentId: props.documentId,
     resourceScopeId: props.resourceScopeId ?? '',
-    allowRemoteHttpsImages: false,
+    allowRemoteHttpsImages: props.allowRemoteHttpsImages === true,
     resolveLink: async (href): Promise<PreviewLinkResolution> => {
       const result = await window.markhere.resources.resolveLink({ documentId: props.documentId, href })
       return result.ok ? result.data : { kind: 'blocked', reason: result.error.code }
@@ -94,7 +95,7 @@ onMounted(async () => {
 })
 
 watch(
-  () => [props.documentId, props.resourceScopeId, props.revision, props.markdown] as const,
+  () => [props.documentId, props.resourceScopeId, props.revision, props.markdown, props.allowRemoteHttpsImages] as const,
   () => scheduleRender()
 )
 
@@ -120,11 +121,16 @@ function scrollToStructuralAnchor(anchor: StructuralAnchor): void {
   renderer?.scrollToStructuralAnchor(anchor)
 }
 
+function scrollToHeadingSlug(slug: string): void {
+  const target = root.value?.querySelector<HTMLElement>(`#${CSS.escape(slug)}`) ?? null
+  target?.scrollIntoView({ block: 'start' })
+}
+
 function onPreviewScroll(): void {
   if (renderer) emit('scrollAnchor', renderer.captureStructuralAnchor())
 }
 
-defineExpose({ captureStructuralAnchor, scrollToStructuralAnchor })
+defineExpose({ captureStructuralAnchor, scrollToStructuralAnchor, scrollToHeadingSlug })
 
 onBeforeUnmount(() => {
   coordinator.cancel()

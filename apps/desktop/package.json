@@ -27,7 +27,8 @@
     "vue": "3.5.38",
     "@markhere/editor-core": "workspace:*",
     "@markhere/editor-session": "workspace:*",
-    "@markhere/source-editor": "workspace:*"
+    "@markhere/source-editor": "workspace:*",
+    "@vscode/ripgrep": "1.18.0"
   },
   "devDependencies": {
     "@types/node": "22.20.2",

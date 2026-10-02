@@ -27,6 +27,8 @@ export interface SourceEditorOptions {
   readonly markdown: string
   readonly wrap?: boolean
   readonly lineNumbers?: boolean
+  readonly dark?: boolean
+  readonly onSelectionChange?: (selection: SourceEditorSelectionSnapshot) => void
   readonly onChange: (change: SourceEditorChange) => void
   readonly onScrollAnchor?: (anchor: StructuralAnchor) => void
 }
@@ -45,19 +47,24 @@ function offsetFor(view: EditorView, value: TextPosition): number {
 export class SourceEditorAdapter {
   readonly #wrap = new Compartment()
   readonly #lineNumbers = new Compartment()
+  readonly #theme = new Compartment()
   readonly #onChange: SourceEditorOptions['onChange']
+  readonly #onSelectionChange?: SourceEditorOptions['onSelectionChange']
   readonly #onScrollAnchor?: SourceEditorOptions['onScrollAnchor']
   #view: EditorView
   #external = false
   #wrapEnabled: boolean
   #lineNumbersEnabled: boolean
+  #dark: boolean
   #scrollHandler: (() => void) | null = null
 
   constructor(target: HTMLElement, options: SourceEditorOptions) {
     this.#onChange = options.onChange
+    this.#onSelectionChange = options.onSelectionChange
     this.#onScrollAnchor = options.onScrollAnchor
     this.#wrapEnabled = options.wrap !== false
     this.#lineNumbersEnabled = options.lineNumbers !== false
+    this.#dark = options.dark === true
     this.#view = new EditorView({ parent: target, state: this.#createState(options.markdown) })
     if (this.#onScrollAnchor) {
       const handler = (): void => this.#onScrollAnchor?.(this.captureStructuralAnchor())
@@ -87,7 +94,7 @@ export class SourceEditorAdapter {
     this.restoreSelection({ cursor: previous.cursor })
   }
 
-  setOptions(options: { wrap?: boolean; lineNumbers?: boolean }): void {
+  setOptions(options: { wrap?: boolean; lineNumbers?: boolean; dark?: boolean }): void {
     const effects = []
     if (options.wrap !== undefined) {
       this.#wrapEnabled = options.wrap
@@ -96,6 +103,10 @@ export class SourceEditorAdapter {
     if (options.lineNumbers !== undefined) {
       this.#lineNumbersEnabled = options.lineNumbers
       effects.push(this.#lineNumbers.reconfigure(options.lineNumbers ? lineNumbers() : []))
+    }
+    if (options.dark !== undefined) {
+      this.#dark = options.dark
+      effects.push(this.#theme.reconfigure(this.#editorTheme(options.dark)))
     }
     if (effects.length) this.#view.dispatch({ effects })
   }
@@ -143,6 +154,14 @@ export class SourceEditorAdapter {
   openFind(): boolean { return openSearchPanel(this.#view) }
   closeFind(): boolean { return closeSearchPanel(this.#view) }
 
+
+  insertMarkdown(text: string): void {
+    const selection = this.#view.state.selection.main
+    const cursor = selection.from + text.length
+    this.#view.dispatch({ changes: { from: selection.from, to: selection.to, insert: text }, selection: { anchor: cursor }, scrollIntoView: true })
+    this.#view.focus()
+  }
+
   execute(command: SourceEditorCommand): boolean {
     if (command === 'history.undo') return this.undo()
     if (command === 'history.redo') return this.redo()
@@ -165,6 +184,18 @@ export class SourceEditorAdapter {
     return true
   }
 
+
+  #editorTheme(dark: boolean) {
+    return EditorView.theme({
+      '&': { height: '100%', fontSize: '14px', backgroundColor: dark ? '#111827' : '#ffffff', color: dark ? '#e5e7eb' : '#1f2328' },
+      '.cm-scroller': { overflow: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace' },
+      '.cm-content': { padding: '18px 0', caretColor: dark ? '#f8fafc' : '#111827' },
+      '.cm-gutters': { backgroundColor: dark ? '#0f172a' : '#f8fafc', color: dark ? '#94a3b8' : '#64748b', border: '0' },
+      '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: dark ? '#1e293b' : '#f1f5f9' },
+      '&.cm-focused': { outline: 'none' }
+    }, { dark })
+  }
+
   #createState(markdownText: string): EditorState {
     return EditorState.create({
       doc: markdownText,
@@ -174,14 +205,10 @@ export class SourceEditorAdapter {
         keymap.of(searchKeymap),
         this.#wrap.of(this.#wrapEnabled ? EditorView.lineWrapping : []),
         this.#lineNumbers.of(this.#lineNumbersEnabled ? lineNumbers() : []),
+        this.#theme.of(this.#editorTheme(this.#dark)),
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !this.#external) this.#onChange({ markdown: update.state.doc.toString(), selection: this.captureSelection() })
-        }),
-        EditorView.theme({
-          '&': { height: '100%', fontSize: '14px' },
-          '.cm-scroller': { overflow: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace' },
-          '.cm-content': { padding: '18px 0' },
-          '&.cm-focused': { outline: 'none' }
+          else if (update.selectionSet && !this.#external) this.#onSelectionChange?.(this.captureSelection())
         })
       ]
     })

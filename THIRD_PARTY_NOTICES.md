@@ -14,6 +14,10 @@ The adapted code does not make Muya canonical application state: canonical conte
 
 Issue 5 adds exact CodeMirror 6 runtime dependencies to `@markhere/source-editor`. Their package-level license notices will be emitted from the production dependency graph by the compliance generator once a genuine `pnpm-lock.yaml` is created on a network-enabled machine.
 
+## ripgrep / @vscode/ripgrep
+
+Issue 6 uses exact dependency **`@vscode/ripgrep` 1.18.0** to provide the reviewed ripgrep executable used by the main-process workspace search service. Search is invoked directly with `shell: false`, remains scoped to a main-owned workspace root, is cancellable, and does not require a separately installed system `rg`. The package/ripgrep license notice must also be emitted by the lockfile-derived compliance generator before distribution.
+
 ## MarkText reference material
 
 MarkText remains an architectural and behavioral reference. The MarkText MIT license is retained at `docs/provenance/licenses/MARKTEXT-MIT.txt` for previously recorded provenance/reference use. Any future copied or materially adapted source must be marked with `@markhere-upstream`, entered in `docs/provenance/provenance.json`, and distributed with its applicable notice.

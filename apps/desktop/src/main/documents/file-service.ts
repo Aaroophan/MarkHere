@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { access, readFile, rename, stat } from 'node:fs/promises'
+import { access, mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { shell } from 'electron'
@@ -8,7 +8,9 @@ import type {
   DocumentStatDTO,
   FileFingerprint,
   FileMutationResult,
+  ImportedImageResult,
   OpenDocumentDTO,
+  RecentItemDTO,
   SaveDocumentAsRequest,
   SaveDocumentRequest,
   SaveDocumentResult
@@ -17,7 +19,7 @@ import type { OpenedVia } from '@markhere/document-model'
 import { failure, ok } from '../services/api-results'
 import type { SelectionTokenStore } from '../services/selection-token-store'
 import { FileCapabilityRegistry } from './file-capability-registry'
-import { identifyExistingPath, normalizeTargetPath } from './path-identity'
+import { identifyExistingPath, normalizeTargetPath, sameKnownPath } from './path-identity'
 import { decodeDocumentBytes, encodeDocumentText } from './text-codec'
 import { fingerprintFile, fingerprintMatchesExpected } from './fingerprint'
 import { atomicReplaceFile } from './atomic-write'
@@ -53,8 +55,8 @@ export class FileService {
   readonly #runtime = new Map<string, RuntimeDocumentRecord>()
   readonly #recents: RecentDocumentStore
   readonly #resources: ResourceCapabilityBroker
-  readonly #onSaved?: (documentId: string, throughRevision: number) => Promise<void>
-  readonly #onOpened?: (ownerWebContentsId: number, writable: boolean) => void
+  readonly #onSaved: ((documentId: string, throughRevision: number) => Promise<void>) | undefined
+  readonly #onOpened: ((ownerWebContentsId: number, writable: boolean) => void) | undefined
 
   constructor(options: {
     selections: SelectionTokenStore
@@ -94,6 +96,14 @@ export class FileService {
     try { return await this.#openPath(path, ownerWebContentsId, 'recent') } catch (error) { return mapFsFailure(error, 'reopen') }
   }
 
+  async openWorkspacePath(path: string, ownerWebContentsId: number): Promise<ApiResult<OpenDocumentDTO>> {
+    try { return await this.#openPath(path, ownerWebContentsId, 'workspace') } catch (error) { return mapFsFailure(error, 'workspace-open') }
+  }
+
+  async listRecent(): Promise<ApiResult<RecentItemDTO[]>> { return ok(await this.#recents.listDocuments()) }
+  async removeRecent(recentId: string): Promise<ApiResult<void>> { await this.#recents.remove(recentId, 'file'); return ok(undefined) }
+  async clearRecent(): Promise<ApiResult<void>> { await this.#recents.clear('file'); return ok(undefined) }
+
   async #openPath(path: string, ownerWebContentsId: number, openedVia: OpenedVia): Promise<ApiResult<OpenDocumentDTO>> {
     const identity = await identifyExistingPath(path)
     const info = await stat(identity.canonicalPath)
@@ -103,6 +113,23 @@ export class FileService {
     const fingerprint = await fingerprintFile(identity.canonicalPath, true)
     let writable = true
     try { await access(identity.canonicalPath, constants.W_OK) } catch { writable = false }
+    const existing = this.#files.listForWebContents(ownerWebContentsId).find((record) => sameKnownPath(record.path, identity))
+    if (existing) {
+      const runtime = this.#runtime.get(existing.documentId)
+      await this.#recents.add(path)
+      return ok({
+        documentId: existing.documentId,
+        displayPath: existing.path.displayPath,
+        basename: basename(existing.path.displayPath),
+        markdown: decoded.markdown,
+        revision: runtime?.persistedRevision ?? 1,
+        persistedRevision: runtime?.persistedRevision ?? 1,
+        fingerprint,
+        textFormat: decoded.textFormat,
+        writable: existing.permissions.has('write'),
+        resourceScopeId: this.#resources.scopeForDocument(existing.documentId, ownerWebContentsId) ?? this.#resources.bindDocument(existing.documentId, ownerWebContentsId, dirname(existing.path.canonicalPath))
+      })
+    }
     const documentId = randomUUID()
     this.#files.create({ documentId, ownerWebContentsId, path: identity, writable, openedVia })
     this.#runtime.set(documentId, { documentId, ownerWebContentsId, persistedRevision: 1, fingerprint })
@@ -168,7 +195,10 @@ export class FileService {
   async saveDocumentAs(request: SaveDocumentAsRequest, ownerWebContentsId: number): Promise<ApiResult<SaveDocumentResult>> {
     return this.#saveQueue.enqueue(request.documentId, async () => {
       try {
-        this.#files.get(request.documentId, ownerWebContentsId, 'read')
+        const existingCapability = this.#files.find(request.documentId)
+        if (existingCapability && existingCapability.ownerWebContentsId !== ownerWebContentsId) {
+          return failure('SEC_CAPABILITY_NOT_OWNED', 'security', 'error.capabilityNotOwned', false)
+        }
         const targetRecord = this.#selections.consume(request.targetSelectionToken, 'document-save', ownerWebContentsId)
         const targetPath = normalizeTargetPath(targetRecord.path)
         const bytes = encodeDocumentText(request.markdown, request.textFormat)
@@ -183,6 +213,8 @@ export class FileService {
         if (runtime) {
           runtime.persistedRevision = Math.max(runtime.persistedRevision, request.revision)
           runtime.fingerprint = fingerprint
+        } else {
+          this.#runtime.set(request.documentId, { documentId: request.documentId, ownerWebContentsId, persistedRevision: request.revision, fingerprint })
         }
         this.#watch.watchDocument(request.documentId, identity.canonicalPath)
         this.#watch.recordExpectedWrite({ documentId: request.documentId, canonicalPath: identity.canonicalPath, fingerprint, saveToken: randomUUID(), expiresAt: Date.now() + 5_000 })
@@ -247,6 +279,42 @@ export class FileService {
       this.#runtime.delete(documentId)
       return ok(undefined)
     } catch (error) { return mapFsFailure(error, 'trash') }
+  }
+
+
+  async copyImportedImage(
+    request: { documentId: string; mimeType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'; bytes: Uint8Array; preferredName?: string },
+    ownerWebContentsId: number
+  ): Promise<ApiResult<ImportedImageResult>> {
+    if (request.bytes.byteLength === 0 || request.bytes.byteLength > 8 * 1024 * 1024) {
+      return failure('IMAGE_SIZE_INVALID', 'validation', 'error.imageSizeInvalid', true)
+    }
+    const extensions: Readonly<Record<typeof request.mimeType, string>> = {
+      'image/png': '.png',
+      'image/jpeg': '.jpg',
+      'image/webp': '.webp',
+      'image/gif': '.gif'
+    }
+    try {
+      const capability = this.#files.get(request.documentId, ownerWebContentsId, 'write')
+      const assetDirectory = join(dirname(capability.path.canonicalPath), 'assets')
+      await mkdir(assetDirectory, { recursive: true })
+      const requestedStem = (request.preferredName ?? 'image')
+        .replace(/\.[^.]+$/u, '')
+        .replace(/[^\p{L}\p{N}._-]+/gu, '-')
+        .replace(/^-+|-+$/gu, '')
+        .slice(0, 80) || 'image'
+      const extension = extensions[request.mimeType]
+      let target = join(assetDirectory, `${requestedStem}${extension}`)
+      let suffix = 1
+      while (true) {
+        try { await access(target); target = join(assetDirectory, `${requestedStem}-${suffix++}${extension}`) }
+        catch { break }
+      }
+      await writeFile(target, request.bytes, { flag: 'wx' })
+      const markdownPath = `./assets/${basename(target)}`
+      return ok({ markdownPath, displayPath: target })
+    } catch (error) { return mapFsFailure(error, 'copy-imported-image') }
   }
 
   async renameDocument(documentId: string, newBasename: string, ownerWebContentsId: number): Promise<ApiResult<FileMutationResult>> {

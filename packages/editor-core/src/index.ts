@@ -283,6 +283,21 @@ export class MuyaWysiwygEditorAdapter {
     this.#muya.replace(value, { isSingle: !all, isRegexp: false })
   }
 
+
+  insertMarkdown(text: string): boolean {
+    const before = this.#muya.getMarkdown()
+    const cursor = getIndexCursor(this.#muya)
+    if (!cursor?.anchor || !cursor.focus) return false
+    const anchor = absoluteOffset(before, cursor.anchor)
+    const focus = absoluteOffset(before, cursor.focus)
+    const from = Math.min(anchor, focus)
+    const to = Math.max(anchor, focus)
+    const after = `${before.slice(0, from)}${text}${before.slice(to)}`
+    const nextOffset = from + text.length
+    this.#recordSyntheticReplacement(before, after, cursor, resultCursor(after, nextOffset, nextOffset))
+    return true
+  }
+
   execute(command: WysiwygEditorCommand): boolean {
     if (command === 'history.undo') return this.undo()
     if (command === 'history.redo') return this.redo()

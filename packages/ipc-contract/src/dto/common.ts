@@ -5,6 +5,7 @@ export type ErrorCategory =
   | 'filesystem'
   | 'conflict'
   | 'security'
+  | 'workspace'
   | 'export'
   | 'update'
   | 'cancelled'
@@ -51,6 +52,7 @@ export type CommandId =
   | 'edit.find'
   | 'edit.replace'
   | 'app.settings'
+  | 'app.commandPalette'
   | 'app.quit'
 
 export interface AppCommandEvent {

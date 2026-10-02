@@ -59,10 +59,12 @@ export const SettingsPatchSchema = z.object({
   appearance: z.enum(['light', 'dark', 'system']).optional(),
   defaultMode: z.enum(['preview', 'wysiwyg', 'source', 'split']).optional(),
   autosave: z.boolean().optional(),
+  autosaveDelayMs: z.number().int().min(500).max(60000).optional(),
   remoteResources: z.enum(['block', 'ask', 'allow-https']).optional(),
   lineNumbers: z.boolean().optional(),
   splitRatio: z.number().min(0.1).max(0.9).optional(),
-  syncScroll: z.boolean().optional()
+  syncScroll: z.boolean().optional(),
+  imageStorage: z.enum(['beside-document', 'data-uri']).optional()
 }).strict()
 
 export const AppCommandEventSchema = z.object({
@@ -70,7 +72,7 @@ export const AppCommandEventSchema = z.object({
     'file.new', 'file.open', 'file.openFolder', 'file.save', 'file.saveAs',
     'file.export.html', 'file.export.pdf', 'file.export.docx',
     'view.mode.preview', 'view.mode.wysiwyg', 'view.mode.source', 'view.mode.split',
-    'edit.find', 'edit.replace', 'app.settings', 'app.quit'
+    'edit.find', 'edit.replace', 'app.settings', 'app.commandPalette', 'app.quit'
   ]),
   source: z.enum(['menu', 'shortcut', 'system'])
 }).strict()
@@ -140,6 +142,9 @@ export const INVOKE_ARG_SCHEMAS: Record<InvokeChannel, z.ZodType> = {
   [CHANNELS.dialogsConfirm]: z.tuple([ConfirmDialogRequestSchema]),
   [CHANNELS.fileOpenSelected]: oneToken,
   [CHANNELS.fileReopenRecent]: oneId,
+  [CHANNELS.fileListRecent]: voidArgs,
+  [CHANNELS.fileRemoveRecent]: oneId,
+  [CHANNELS.fileClearRecent]: voidArgs,
   [CHANNELS.fileSave]: z.tuple([SaveDocumentRequestSchema]),
   [CHANNELS.fileSaveAs]: z.tuple([SaveDocumentAsRequestSchema]),
   [CHANNELS.fileStat]: oneId,
@@ -147,8 +152,12 @@ export const INVOKE_ARG_SCHEMAS: Record<InvokeChannel, z.ZodType> = {
   [CHANNELS.fileReveal]: oneId,
   [CHANNELS.fileTrash]: oneId,
   [CHANNELS.fileRename]: z.tuple([z.object({ documentId: id, newBasename: boundedString(255) }).strict()]),
-  [CHANNELS.fileCopyImportedImage]: z.tuple([z.object({ documentId: id, temporaryImageToken: id, preferredName: optionalShort }).strict()]),
+  [CHANNELS.fileCopyImportedImage]: z.tuple([z.object({ documentId: id, mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp', 'image/gif']), bytes: z.instanceof(Uint8Array).refine((value) => value.byteLength <= 8 * 1024 * 1024, 'image is too large'), preferredName: optionalShort }).strict()]),
   [CHANNELS.workspaceOpen]: oneToken,
+  [CHANNELS.workspaceReopenRecent]: oneId,
+  [CHANNELS.workspaceListRecent]: voidArgs,
+  [CHANNELS.workspaceRemoveRecent]: oneId,
+  [CHANNELS.workspaceClearRecent]: voidArgs,
   [CHANNELS.workspaceClose]: oneId,
   [CHANNELS.workspaceList]: z.tuple([z.object({ workspaceId: id, relativePath: z.string().max(4096).optional() }).strict()]),
   [CHANNELS.workspaceCreateFile]: z.tuple([workspaceRelative]),
@@ -162,7 +171,11 @@ export const INVOKE_ARG_SCHEMAS: Record<InvokeChannel, z.ZodType> = {
     query: z.string().min(1).max(4096),
     caseSensitive: z.boolean().optional(),
     wholeWord: z.boolean().optional(),
-    filePattern: z.string().max(512).optional()
+    regex: z.boolean().optional(),
+    filePattern: z.string().max(512).optional(),
+    includeGlobs: z.array(z.string().min(1).max(512)).max(32).optional(),
+    excludeGlobs: z.array(z.string().min(1).max(512)).max(32).optional(),
+    maxResults: z.number().int().min(1).max(5000).optional()
   }).strict()]),
   [CHANNELS.resourceResolveLink]: z.tuple([z.object({ documentId: id, href: z.string().min(1).max(8192) }).strict()]),
   [CHANNELS.resourceImportLocalImage]: z.tuple([z.object({ documentId: id, selectionToken: token, preferredName: optionalShort }).strict()]),
@@ -210,9 +223,58 @@ export const SEND_ARG_SCHEMAS: Record<SendChannel, z.ZodType> = {
   [CHANNELS.exportCancel]: oneId
 }
 
+const SearchMatchSchema = z.object({
+  relativePath: boundedString(4096),
+  line: z.number().int().positive(),
+  column: z.number().int().positive(),
+  preview: z.string().max(8192),
+  ranges: z.array(z.object({ start: z.number().int().nonnegative(), end: z.number().int().nonnegative() }).strict()).max(256)
+}).strict()
+
+export const WorkspaceSearchBatchEventSchema = z.object({
+  workspaceId: id,
+  searchId: id,
+  matches: z.array(SearchMatchSchema).max(100)
+}).strict()
+
+export const WorkspaceSearchCompletedEventSchema = z.object({
+  workspaceId: id,
+  searchId: id,
+  status: z.enum(['completed', 'cancelled', 'failed']),
+  resultCount: z.number().int().nonnegative().max(5000),
+  truncated: z.boolean(),
+  errorCode: z.string().max(128).optional()
+}).strict()
+
+export const SettingsChangedEventSchema = z.object({
+  settings: z.object({
+    revision: z.number().int().positive(),
+    appearance: z.enum(['light', 'dark', 'system']),
+    defaultMode: z.enum(['preview', 'wysiwyg', 'source', 'split']),
+    autosave: z.boolean(),
+    autosaveDelayMs: z.number().int().min(500).max(60000),
+    remoteResources: z.enum(['block', 'ask', 'allow-https']),
+    lineNumbers: z.boolean(),
+    splitRatio: z.number().min(0.1).max(0.9),
+    syncScroll: z.boolean(),
+    imageStorage: z.enum(['beside-document', 'data-uri'])
+  }).strict()
+}).strict()
+
+export const KeybindingsChangedEventSchema = z.object({
+  config: z.object({
+    revision: z.number().int().nonnegative(),
+    bindings: z.record(z.string().max(160), z.string().max(160))
+  }).strict()
+}).strict()
+
 export const MAIN_EVENT_SCHEMAS = Object.freeze({
   [CHANNELS.eventDocumentExternalChange]: DocumentExternalChangeEventSchema,
   [CHANNELS.eventWorkspaceChange]: WorkspaceChangeEventSchema,
+  [CHANNELS.eventWorkspaceSearchBatch]: WorkspaceSearchBatchEventSchema,
+  [CHANNELS.eventWorkspaceSearchCompleted]: WorkspaceSearchCompletedEventSchema,
+  [CHANNELS.eventSettingsChanged]: SettingsChangedEventSchema,
+  [CHANNELS.eventKeybindingsChanged]: KeybindingsChangedEventSchema,
   [CHANNELS.eventExportProgress]: ExportProgressEventSchema,
   [CHANNELS.eventExportCompleted]: ExportCompletedEventSchema,
   [CHANNELS.eventUpdateStatus]: UpdateStatusSchema,

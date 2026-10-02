@@ -71,7 +71,7 @@ export function installApplicationMenu(commands: ApplicationCommandRegistry): ()
       },
       { 
         label: 'MarkHere',
-        submenu: [commandItem('app.settings')]
+        submenu: [commandItem('app.commandPalette'), { type: 'separator' }, commandItem('app.settings')]
       } 
     ]
 

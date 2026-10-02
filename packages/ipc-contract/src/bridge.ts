@@ -1,11 +1,6 @@
 import type { AppInfo, PlatformInfo } from './dto/app'
 import type { ClipboardImageDTO, RichClipboardRequest } from './dto/clipboard'
-import type {
-  ApiResult,
-  SelectedPath,
-  SettingsSection,
-  Unsubscribe
-} from './dto/common'
+import type { ApiResult, SelectedPath, SettingsSection, Unsubscribe } from './dto/common'
 import type {
   ConfirmDialogRequest,
   ConfirmDialogResult,
@@ -17,26 +12,26 @@ import type {
   DocumentExternalChangeEvent,
   ExportCompletedEvent,
   ExportProgressEvent,
+  KeybindingsChangedEvent,
+  SettingsChangedEvent,
   UpdateStatus,
   WindowStateEvent,
-  WorkspaceChangeEvent
+  WorkspaceChangeEvent,
+  WorkspaceSearchBatchEvent,
+  WorkspaceSearchCompletedEvent
 } from './dto/events'
 import type {
+  CopyImportedImageRequest,
   DocumentStatDTO,
   FileMutationResult,
   ImportedImageResult,
   OpenDocumentDTO,
   RenameDocumentRequest,
-  CopyImportedImageRequest,
   SaveDocumentAsRequest,
   SaveDocumentRequest,
   SaveDocumentResult
 } from './dto/files'
-import type {
-  ExportJobDTO,
-  ExportFormat,
-  StartExportRequest
-} from './dto/export'
+import type { ExportFormat, ExportJobDTO, StartExportRequest } from './dto/export'
 import type {
   ImportLocalImageRequest,
   ResolveDocumentLinkRequest,
@@ -48,11 +43,7 @@ import type {
   RecoveryUpdateRequest,
   RecoveryUpdateResult
 } from './dto/recovery'
-import type {
-  KeybindingConfig,
-  MarkHereSettings,
-  SettingsPatch
-} from './dto/settings'
+import type { KeybindingConfig, MarkHereSettings, SettingsPatch } from './dto/settings'
 import type { UpdateStatus as UpdateStatusDTO } from './dto/update'
 import type {
   CreateWorkspaceDirectoryRequest,
@@ -60,6 +51,7 @@ import type {
   ListWorkspaceRequest,
   MoveWorkspaceEntryRequest,
   OpenWorkspaceEntryRequest,
+  RecentItemDTO,
   RenameWorkspaceEntryRequest,
   SearchRequest,
   TrashWorkspaceEntryRequest,
@@ -96,6 +88,9 @@ export interface DialogApi {
 export interface FileApi {
   openSelected(selectionToken: string): Promise<ApiResult<OpenDocumentDTO>>
   reopenRecent(recentId: string): Promise<ApiResult<OpenDocumentDTO>>
+  listRecent(): Promise<ApiResult<RecentItemDTO[]>>
+  removeRecent(recentId: string): Promise<ApiResult<void>>
+  clearRecent(): Promise<ApiResult<void>>
   saveDocument(request: SaveDocumentRequest): Promise<ApiResult<SaveDocumentResult>>
   saveDocumentAs(request: SaveDocumentAsRequest): Promise<ApiResult<SaveDocumentResult>>
   statDocument(documentId: string): Promise<ApiResult<DocumentStatDTO>>
@@ -108,6 +103,10 @@ export interface FileApi {
 
 export interface WorkspaceApi {
   open(selectionToken: string): Promise<ApiResult<WorkspaceDTO>>
+  reopenRecent(recentId: string): Promise<ApiResult<WorkspaceDTO>>
+  listRecent(): Promise<ApiResult<RecentItemDTO[]>>
+  removeRecent(recentId: string): Promise<ApiResult<void>>
+  clearRecent(): Promise<ApiResult<void>>
   close(workspaceId: string): Promise<ApiResult<void>>
   list(request: ListWorkspaceRequest): Promise<ApiResult<WorkspaceEntry[]>>
   createFile(request: CreateWorkspaceFileRequest): Promise<ApiResult<FileMutationResult>>
@@ -169,6 +168,10 @@ export interface UpdateApi {
 export interface EventApi {
   onDocumentExternalChange(cb: (event: DocumentExternalChangeEvent) => void): Unsubscribe
   onWorkspaceChange(cb: (event: WorkspaceChangeEvent) => void): Unsubscribe
+  onWorkspaceSearchBatch(cb: (event: WorkspaceSearchBatchEvent) => void): Unsubscribe
+  onWorkspaceSearchCompleted(cb: (event: WorkspaceSearchCompletedEvent) => void): Unsubscribe
+  onSettingsChanged(cb: (event: SettingsChangedEvent) => void): Unsubscribe
+  onKeybindingsChanged(cb: (event: KeybindingsChangedEvent) => void): Unsubscribe
   onExportProgress(cb: (event: ExportProgressEvent) => void): Unsubscribe
   onExportCompleted(cb: (event: ExportCompletedEvent) => void): Unsubscribe
   onUpdateStatus(cb: (event: UpdateStatus) => void): Unsubscribe

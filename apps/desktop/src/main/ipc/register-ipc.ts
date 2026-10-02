@@ -4,17 +4,12 @@ import {
   type ApiResult,
   type OpenDocumentDTO,
   type SaveDocumentResult,
-  type DocumentStatDTO,
   type FileMutationResult,
   type ImportedImageResult,
   type WorkspaceDTO,
   type WorkspaceEntry,
   type ResolvedDocumentLink,
-  type MarkHereSettings,
-  type KeybindingConfig,
   type RecoveryUpdateResult,
-  type RecoverySummary,
-  type RecoveryDocumentDTO,
   type ExportJobDTO,
   type UpdateStatus
 } from '@markhere/ipc-contract'
@@ -30,6 +25,8 @@ import type { FileService } from '../documents/file-service'
 import type { RecoveryService } from '../storage/recovery-service'
 import type { ResourceService } from '../resources/resource-service'
 import type { SettingsService } from '../storage/settings-service'
+import type { KeybindingService } from '../storage/keybinding-service'
+import type { WorkspaceService } from '../workspace/workspace-service'
 import type { SelectionTokenKind, SelectionTokenStore } from '../services/selection-token-store'
 import { failure } from '../services/api-results'
 import { registerValidatedInvoke, registerValidatedSend } from './validated-ipc'
@@ -47,6 +44,8 @@ export interface IpcServices {
   readonly resources: ResourceService
   readonly recovery: RecoveryService
   readonly settings: SettingsService
+  readonly keybindings: KeybindingService
+  readonly workspace: WorkspaceService
   readonly future: FutureService
 }
 
@@ -97,6 +96,9 @@ export function registerIpcHandlers(services: IpcServices): void {
     selectionOrFailure<OpenDocumentDTO>(selections, token, 'document-open', sender.webContentsId)
       ?? services.files.openSelected(token, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.fileReopenRecent, (_event, sender, recentId) => services.files.reopenRecent(recentId, sender.webContentsId))
+  registerValidatedInvoke(trusted, CHANNELS.fileListRecent, () => services.files.listRecent())
+  registerValidatedInvoke(trusted, CHANNELS.fileRemoveRecent, (_event, _sender, recentId) => services.files.removeRecent(recentId))
+  registerValidatedInvoke(trusted, CHANNELS.fileClearRecent, () => services.files.clearRecent())
   registerValidatedInvoke(trusted, CHANNELS.fileSave, (_event, sender, request) =>
     services.files.saveDocument(request, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.fileSaveAs, (_event, sender, request) =>
@@ -114,39 +116,43 @@ export function registerIpcHandlers(services: IpcServices): void {
     services.files.renameDocument(request.documentId, request.newBasename, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.fileCopyImportedImage, (_event, sender, request) =>
     ownedOrFailure<ImportedImageResult>(capabilities, request.documentId, 'document', sender.webContentsId)
-      ?? services.future.unavailable('files.copyImportedImage'))
+      ?? services.files.copyImportedImage(request, sender.webContentsId))
 
   registerValidatedInvoke(trusted, CHANNELS.workspaceOpen, (_event, sender, token) =>
     selectionOrFailure<WorkspaceDTO>(selections, token, 'workspace-open', sender.webContentsId)
-      ?? services.future.unavailable('workspaces.open'))
+      ?? services.workspace.openSelected(token, sender.webContentsId))
+  registerValidatedInvoke(trusted, CHANNELS.workspaceReopenRecent, (_event, sender, recentId) => services.workspace.reopenRecent(recentId, sender.webContentsId))
+  registerValidatedInvoke(trusted, CHANNELS.workspaceListRecent, async () => ({ ok: true as const, data: await services.workspace.listRecent() }))
+  registerValidatedInvoke(trusted, CHANNELS.workspaceRemoveRecent, async (_event, _sender, recentId) => { await services.workspace.removeRecent(recentId); return { ok: true as const, data: undefined } })
+  registerValidatedInvoke(trusted, CHANNELS.workspaceClearRecent, async () => { await services.workspace.clearRecent(); return { ok: true as const, data: undefined } })
   registerValidatedInvoke(trusted, CHANNELS.workspaceClose, (_event, sender, workspaceId) =>
     ownedOrFailure<void>(capabilities, workspaceId, 'workspace', sender.webContentsId)
-      ?? services.future.unavailable('workspaces.close'))
+      ?? services.workspace.close(workspaceId, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.workspaceList, (_event, sender, request) =>
     ownedOrFailure<WorkspaceEntry[]>(capabilities, request.workspaceId, 'workspace', sender.webContentsId)
-      ?? services.future.unavailable('workspaces.list'))
+      ?? services.workspace.list(request.workspaceId, request.relativePath, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.workspaceCreateFile, (_event, sender, request) =>
     ownedOrFailure<FileMutationResult>(capabilities, request.workspaceId, 'workspace', sender.webContentsId)
-      ?? services.future.unavailable('workspaces.createFile'))
+      ?? services.workspace.createFile(request.workspaceId, request.relativePath, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.workspaceCreateDirectory, (_event, sender, request) =>
     ownedOrFailure<FileMutationResult>(capabilities, request.workspaceId, 'workspace', sender.webContentsId)
-      ?? services.future.unavailable('workspaces.createDirectory'))
+      ?? services.workspace.createDirectory(request.workspaceId, request.relativePath, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.workspaceRename, (_event, sender, request) =>
     ownedOrFailure<FileMutationResult>(capabilities, request.workspaceId, 'workspace', sender.webContentsId)
-      ?? services.future.unavailable('workspaces.rename'))
+      ?? services.workspace.rename(request.workspaceId, request.relativePath, request.newName, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.workspaceMove, (_event, sender, request) =>
     ownedOrFailure<FileMutationResult>(capabilities, request.workspaceId, 'workspace', sender.webContentsId)
-      ?? services.future.unavailable('workspaces.move'))
+      ?? services.workspace.move(request.workspaceId, request.relativePath, request.targetRelativePath, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.workspaceTrash, (_event, sender, request) =>
     ownedOrFailure<void>(capabilities, request.workspaceId, 'workspace', sender.webContentsId)
-      ?? services.future.unavailable('workspaces.trash'))
+      ?? services.workspace.trash(request.workspaceId, request.relativePath, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.workspaceOpenEntry, (_event, sender, request) =>
     ownedOrFailure<OpenDocumentDTO>(capabilities, request.workspaceId, 'workspace', sender.webContentsId)
-      ?? services.future.unavailable('workspaces.openEntry'))
+      ?? services.workspace.openEntry(request.workspaceId, request.relativePath, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.workspaceSearch, (_event, sender, request) =>
     ownedOrFailure<{ searchId: string }>(capabilities, request.workspaceId, 'workspace', sender.webContentsId)
-      ?? services.future.unavailable('workspaces.search'))
-  registerValidatedSend(trusted, CHANNELS.workspaceCancelSearch, () => undefined)
+      ?? services.workspace.search(request, sender.webContentsId))
+  registerValidatedSend(trusted, CHANNELS.workspaceCancelSearch, (_event, sender, searchId) => services.workspace.cancelSearch(searchId, sender.webContentsId))
 
   registerValidatedInvoke(trusted, CHANNELS.resourceResolveLink, (_event, sender, request) =>
     ownedOrFailure<ResolvedDocumentLink>(capabilities, request.documentId, 'document', sender.webContentsId)
@@ -162,8 +168,8 @@ export function registerIpcHandlers(services: IpcServices): void {
   registerValidatedInvoke(trusted, CHANNELS.settingsGet, () => services.settings.get())
   registerValidatedInvoke(trusted, CHANNELS.settingsUpdate, (_event, _sender, patch) => services.settings.update(patch))
   registerValidatedInvoke(trusted, CHANNELS.settingsReset, (_event, _sender, section) => services.settings.reset(section))
-  registerValidatedInvoke(trusted, CHANNELS.settingsGetKeybindings, () => services.future.unavailable<KeybindingConfig>('settings.getKeybindings'))
-  registerValidatedInvoke(trusted, CHANNELS.settingsUpdateKeybindings, () => services.future.unavailable<KeybindingConfig>('settings.updateKeybindings'))
+  registerValidatedInvoke(trusted, CHANNELS.settingsGetKeybindings, () => services.keybindings.get())
+  registerValidatedInvoke(trusted, CHANNELS.settingsUpdateKeybindings, (_event, _sender, config) => services.keybindings.update(config))
 
   registerValidatedInvoke(trusted, CHANNELS.recoveryUpdate, (_event, sender, request) =>
     ownedOrFailure<RecoveryUpdateResult>(capabilities, request.documentId, 'document', sender.webContentsId)

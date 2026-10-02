@@ -11,6 +11,7 @@ This repository implements:
 - **Issue 3 — Implement the Canonical Document Model, Filesystem Lifecycle, Atomic Persistence, Conflicts, and Recovery**
 - **Issue 4 — Implement the Markdown Dialect, Parsing, Safe Rendering, Resource Broker, and Preview Pipeline**
 - **Issue 5 — Implement Source, WYSIWYG, Preview, and Split Editing as Four First-Class Modes**
+- **Issue 6 — Implement the MarkHere Desktop Workspace, Navigation, Settings, Themes, Accessibility, and Productivity Features**
 
 The 11 architecture documents in `docs/01-...` through `docs/11-...` are normative. `docs/12-implementation-plan,md` is the implementation backlog derived from them. When implementation and architecture disagree, resolve the architecture conflict explicitly rather than silently weakening a boundary.
 
@@ -65,6 +66,18 @@ See:
 - `docs/development/issue-05-validation.md`
 - `docs/provenance/MUYA_DEPENDENCY.md`
 
+
+## Issue 6 desktop workspace model
+
+Issue 6 turns the editor engine into the working desktop shell. The renderer owns tabs, navigation panels, outline/search presentation, command-palette state, and status presentation; privileged filesystem/workspace authority remains in main. Opening a folder creates a main-owned workspace capability. Tree listing and create/rename/move/trash operations accept only relative paths that are resolved and contained beneath that root, while live updates are delivered through debounced watcher events. Recursive search uses the pinned `@vscode/ripgrep` binary behind an owned cancellable main-process job and streams bounded result batches to the renderer.
+
+Settings are schema-versioned and include Light/Dark/System appearance, default mode, autosave delay, remote-resource policy, source line numbers, split ratio/synchronization, image storage, and validated keybindings. The native menu and command palette share stable command IDs; keybinding collisions are rejected in main. Recent files/workspaces remain metadata only and are revalidated before a new runtime capability is issued. Pasted/dropped images either copy through the document capability into `./assets/` or use the explicitly selected data-URI policy. Autosave reuses the normal revision-aware save pipeline and does not bypass conflict detection.
+
+See:
+
+- `docs/development/issue-06-implementation.md`
+- `docs/development/issue-06-validation.md`
+
 ## Pinned development baseline
 
 - Node.js `22.16.0`
@@ -81,6 +94,7 @@ See:
 - Mermaid `11.15.0`
 - KaTeX `0.18.0`
 - PrismJS `1.30.0`
+- `@vscode/ripgrep` `1.18.0` for bounded, cancellable workspace search
 
 The sandboxed preload is fully bundled into a single CommonJS `index.cjs`; the Electron main process remains ESM.
 
@@ -95,6 +109,7 @@ pnpm check:secure-shell
 pnpm check:document-lifecycle
 pnpm check:markdown-preview
 pnpm check:editor-modes
+pnpm check:desktop-workspace
 pnpm format:check
 pnpm lint
 pnpm typecheck
@@ -139,6 +154,7 @@ pnpm check:secure-shell
 pnpm check:document-lifecycle
 pnpm check:markdown-preview
 pnpm check:editor-modes
+pnpm check:desktop-workspace
 pnpm graph:dependencies
 ```
 

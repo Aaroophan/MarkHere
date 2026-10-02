@@ -20,6 +20,8 @@ const emit = defineEmits<{
   anchorConsumed: []
   error: [message: string]
   settingsChanged: [settings: MarkHereSettings]
+  editorStatus: [status: { mode: DocumentMode; line?: number; column?: number }]
+  navigationAnchor: [anchor: StructuralAnchor]
 }>()
 
 const documents = useDocumentSessionStore()
@@ -38,6 +40,8 @@ const currentSettings = ref<MarkHereSettings>(props.settings)
 const wysiwygSearchOpen = ref(false)
 const wysiwygSearchQuery = ref('')
 const wysiwygReplaceValue = ref('')
+const remoteImagesApproved = ref(false)
+const remoteImagesAllowed = computed(() => currentSettings.value.remoteResources === 'allow-https' || (currentSettings.value.remoteResources === 'ask' && remoteImagesApproved.value))
 let controller: ModeController | null = null
 let syncGuard = false
 let dividerCleanup: (() => void) | null = null
@@ -126,7 +130,13 @@ function releaseSyncGuard(): void {
   requestAnimationFrame(() => { syncGuard = false })
 }
 
+function publishSourceStatus(selection: SourceEditorSelectionSnapshot): void {
+  emit('editorStatus', { mode: renderMode.value, line: selection.cursor.line + 1, column: selection.cursor.column + 1 })
+  emit('navigationAnchor', selection.structuralAnchor)
+}
+
 function syncFromSource(anchor: StructuralAnchor): void {
+  emit('navigationAnchor', anchor)
   if (renderMode.value !== 'split' || !session.value.view.split.syncScroll || syncGuard) return
   pendingSplitAnchor = anchor
   syncGuard = true
@@ -135,6 +145,7 @@ function syncFromSource(anchor: StructuralAnchor): void {
 }
 
 function syncFromPreview(anchor: StructuralAnchor): void {
+  emit('navigationAnchor', anchor)
   if (renderMode.value !== 'split' || !session.value.view.split.syncScroll || syncGuard) return
   syncGuard = true
   sourceAdapter.value?.scrollToStructuralAnchor(anchor)
@@ -149,7 +160,9 @@ async function ensureSource(snapshot: { markdown: string; revision: number }, na
       markdown: snapshot.markdown,
       wrap: session.value.view.source.wrap,
       lineNumbers: currentSettings.value.lineNumbers,
-      onChange: (change) => commitSourceChange(change.markdown, change.selection),
+      dark: document.documentElement.dataset.theme === 'dark',
+      onSelectionChange: publishSourceStatus,
+      onChange: (change) => { commitSourceChange(change.markdown, change.selection); publishSourceStatus(change.selection) },
       onScrollAnchor: syncFromSource
     }))
   } else sourceAdapter.value.applyExternalRevision(snapshot.markdown)
@@ -166,7 +179,11 @@ async function ensureWysiwyg(snapshot: { markdown: string; revision: number }, n
   if (!wysiwygAdapter.value) {
     wysiwygAdapter.value = markRaw(new MuyaWysiwygEditorAdapter(wysiwygHost.value, {
       markdown: snapshot.markdown,
-      onChange: (change) => commitWysiwygChange(change.markdown, change.selection)
+      onChange: (change) => {
+        commitWysiwygChange(change.markdown, change.selection)
+        if (change.selection.cursor) emit('editorStatus', { mode: renderMode.value, line: change.selection.cursor.line + 1, column: change.selection.cursor.column + 1 })
+        emit('navigationAnchor', change.selection.structuralAnchor)
+      }
     }))
   } else if (snapshot.markdown !== wysiwygAdapter.value.markdown) {
     if (suspendedWysiwyg && snapshot.markdown !== suspendedWysiwyg.markdown) {
@@ -195,6 +212,7 @@ async function ensureWysiwyg(snapshot: { markdown: string; revision: number }, n
 
 async function activateMode(mode: DocumentMode, snapshot: { markdown: string; revision: number }, navigation: EditorNavigationSnapshot): Promise<void> {
   renderMode.value = mode
+  emit('editorStatus', { mode })
   if (mode !== 'wysiwyg') wysiwygSearchOpen.value = false
   await nextTick()
   if (mode === 'source' || mode === 'split') {
@@ -317,6 +335,33 @@ function toggleSyncScroll(event: Event): void {
   if (target instanceof HTMLInputElement) void updateSplitPreference({ syncScroll: target.checked })
 }
 
+async function insertMarkdown(text: string): Promise<boolean> {
+  if (renderMode.value === 'preview') await transition('source')
+  if (renderMode.value === 'wysiwyg') return wysiwygAdapter.value?.insertMarkdown(text) ?? false
+  sourceAdapter.value?.insertMarkdown(text)
+  return !!sourceAdapter.value
+}
+
+async function navigateToHeading(sourceLine: number, slug?: string): Promise<void> {
+  const anchor: StructuralAnchor = { sourceLine: Math.max(0, sourceLine), intraBlockRatio: 0 }
+  if (renderMode.value === 'preview' && slug) previewPane.value?.scrollToHeadingSlug(slug)
+  else if (renderMode.value === 'wysiwyg') wysiwygAdapter.value?.scrollToStructuralAnchor(anchor)
+  else sourceAdapter.value?.scrollToStructuralAnchor(anchor)
+}
+
+function adjustDivider(delta: number): void {
+  const ratio = Math.min(0.85, Math.max(0.15, session.value.view.split.ratio + delta))
+  documents.updateSplitView(props.documentId, { ratio })
+  void updateSplitPreference({ splitRatio: ratio })
+}
+
+function onDividerKeydown(event: KeyboardEvent): void {
+  if (event.key === 'ArrowLeft') { event.preventDefault(); adjustDivider(-0.05) }
+  else if (event.key === 'ArrowRight') { event.preventDefault(); adjustDivider(0.05) }
+  else if (event.key === 'Home') { event.preventDefault(); const ratio = 0.15; documents.updateSplitView(props.documentId, { ratio }); void updateSplitPreference({ splitRatio: ratio }) }
+  else if (event.key === 'End') { event.preventDefault(); const ratio = 0.85; documents.updateSplitView(props.documentId, { ratio }); void updateSplitPreference({ splitRatio: ratio }) }
+}
+
 function onPreviewRendered(report: { revision: number }): void {
   documents.updatePreviewView(props.documentId, { renderedRevision: report.revision, renderStatus: 'ready' })
   if (renderMode.value === 'split' && session.value.view.split.syncScroll && pendingSplitAnchor) {
@@ -339,9 +384,11 @@ watch(() => [session.value.buffer.revision, session.value.buffer.markdown] as co
   if (renderMode.value === 'split') documents.updateSplitView(props.documentId, { pendingPreviewRevision: revision })
 })
 
-watch(() => props.settings, (value) => {
+watch(() => props.settings, async (value) => {
   currentSettings.value = value
-  sourceAdapter.value?.setOptions({ lineNumbers: value.lineNumbers })
+  if (value.remoteResources !== 'ask') remoteImagesApproved.value = false
+  await nextTick()
+  sourceAdapter.value?.setOptions({ lineNumbers: value.lineNumbers, dark: document.documentElement.dataset.theme === 'dark' })
 })
 
 onMounted(async () => {
@@ -364,7 +411,7 @@ onBeforeUnmount(() => {
   destroyWysiwyg()
 })
 
-defineExpose({ transition, flushActiveEditable, executeEditorCommand, undo, redo, find, replace, transitions: ALL_MODE_TRANSITIONS })
+defineExpose({ transition, flushActiveEditable, executeEditorCommand, undo, redo, find, replace, insertMarkdown, navigateToHeading, transitions: ALL_MODE_TRANSITIONS })
 </script>
 
 <template>
@@ -402,6 +449,11 @@ defineExpose({ transition, flushActiveEditable, executeEditorCommand, undo, redo
       <button type="button" @click="wysiwygSearchOpen = false">Close</button>
     </form>
 
+    <div v-if="currentSettings.remoteResources === 'ask' && !remoteImagesApproved && (renderMode === 'preview' || renderMode === 'split')" class="remote-resource-prompt" role="status">
+      <span>Remote HTTPS images are blocked for this document.</span>
+      <button type="button" @click="remoteImagesApproved = true">Load remote images</button>
+    </div>
+
     <div v-show="renderMode === 'wysiwyg'" class="editor-pane wysiwyg-pane">
       <div ref="wysiwygHost" class="wysiwyg-host" aria-label="WYSIWYG Markdown editor"></div>
     </div>
@@ -415,6 +467,7 @@ defineExpose({ transition, flushActiveEditable, executeEditorCommand, undo, redo
       :revision="session.buffer.revision"
       :resource-scope-id="session.resourceScope.documentResourceScopeId"
       :requested-anchor="requestedAnchor"
+      :allow-remote-https-images="remoteImagesAllowed"
       @opened-document="forwardOpenedDocument"
       @activate-existing-document="forwardActivateExistingDocument"
       @anchor-consumed="emit('anchorConsumed')"
@@ -426,7 +479,7 @@ defineExpose({ transition, flushActiveEditable, executeEditorCommand, undo, redo
         <div ref="sourceHost" class="source-host" aria-label="Markdown source editor"></div>
       </section>
       <template v-if="renderMode === 'split'">
-        <div class="split-divider" role="separator" aria-orientation="vertical" tabindex="0" @pointerdown="startDividerDrag"></div>
+        <div class="split-divider" role="separator" aria-orientation="vertical" tabindex="0" :aria-valuenow="Math.round(session.view.split.ratio * 100)" aria-valuemin="15" aria-valuemax="85" aria-label="Resize source and preview panes" @pointerdown="startDividerDrag" @keydown="onDividerKeydown"></div>
         <section class="split-preview" :style="{ width: `${(1 - session.view.split.ratio) * 100}%` }">
           <div class="split-options">
             <label><input type="checkbox" :checked="session.view.split.syncScroll" @change="toggleSyncScroll"> Sync scroll</label>
@@ -439,6 +492,7 @@ defineExpose({ transition, flushActiveEditable, executeEditorCommand, undo, redo
             :revision="session.buffer.revision"
             :resource-scope-id="session.resourceScope.documentResourceScopeId"
             :requested-anchor="requestedAnchor"
+            :allow-remote-https-images="remoteImagesAllowed"
             @scroll-anchor="syncFromPreview"
             @opened-document="forwardOpenedDocument"
             @activate-existing-document="forwardActivateExistingDocument"
@@ -452,26 +506,27 @@ defineExpose({ transition, flushActiveEditable, executeEditorCommand, undo, redo
 </template>
 
 <style scoped>
-.document-editor { margin-top: 18px; border: 1px solid #303a50; border-radius: 12px; overflow: hidden; background: #10151f; }
-.editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 9px 10px; border-bottom: 1px solid #303a50; background: #171e2b; }
+.document-editor { margin-top: 18px; border: 1px solid var(--mh-border); border-radius: 12px; overflow: hidden; background: var(--mh-panel); color: var(--mh-text); }
+.editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 9px 10px; border-bottom: 1px solid var(--mh-border); background: var(--mh-panel-alt); }
 .mode-switcher, .format-toolbar { display: flex; flex-wrap: wrap; gap: 5px; }
 .editor-toolbar button { padding: 6px 9px; font-size: 12px; }
-.editor-toolbar button.active { background: #31558b; border-color: #6ca0ee; }
+.editor-toolbar button.active { background: var(--mh-selected); border-color: var(--mh-accent); }
 .editor-toolbar button:disabled { cursor: not-allowed; opacity: .45; }
-.transition-state { margin-left: auto; color: #8090ae; font-size: 11px; }
-.wysiwyg-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid #303a50; background: #131a26; color: #dbe6f8; font-size: 12px; }
+.transition-state { margin-left: auto; color: var(--mh-muted); font-size: 11px; }
+.wysiwyg-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--mh-border); background: var(--mh-panel-alt); color: var(--mh-text); font-size: 12px; }
 .wysiwyg-search label { display: flex; align-items: center; gap: 5px; }
 .wysiwyg-search input { min-width: 150px; padding: 5px 7px; }
-.editor-pane { min-height: 440px; height: min(62vh, 720px); overflow: hidden; background: #fff; color: #1f2328; }
+.editor-pane { min-height: 440px; height: min(62vh, 720px); overflow: hidden; background: var(--mh-panel); color: var(--mh-text); }
 .source-host, .wysiwyg-host { height: 100%; overflow: auto; }
 .source-layout { display: flex; min-height: 440px; height: min(62vh, 720px); }
 .source-layout:not(.split) .source-pane { width: 100%; }
 .split .source-pane { flex: 0 0 auto; }
-.split-divider { width: 7px; flex: 0 0 7px; cursor: col-resize; background: #2c374c; border-left: 1px solid #46536d; border-right: 1px solid #46536d; }
-.split-divider:focus-visible { outline: 2px solid #8bb4ff; z-index: 2; }
-.split-preview { min-width: 0; height: 100%; overflow: hidden; background: #fff; }
+.split-divider { width: 7px; flex: 0 0 7px; cursor: col-resize; background: var(--mh-border); border-left: 1px solid var(--mh-border); border-right: 1px solid var(--mh-border); }
+.split-divider:focus-visible { outline: 2px solid var(--mh-accent); z-index: 2; }
+.split-preview { min-width: 0; height: 100%; overflow: hidden; background: var(--mh-panel); }
 .split-preview :deep(.preview-panel) { height: calc(100% - 30px); margin: 0; border: 0; border-radius: 0; }
 .split-preview :deep(.mh-preview) { max-height: none; height: calc(100% - 36px); }
-.split-options { height: 30px; padding: 5px 10px; color: #44516a; background: #f2f4f8; border-bottom: 1px solid #d8dee8; font-size: 12px; }
+.split-options { height: 30px; padding: 5px 10px; color: var(--mh-muted); background: var(--mh-panel-alt); border-bottom: 1px solid var(--mh-border); font-size: 12px; }
+.remote-resource-prompt { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 10px; border-bottom: 1px solid var(--mh-border); background: var(--mh-panel-alt); color: var(--mh-muted); font-size: 12px; }
 .wysiwyg-host :deep(.mu-container), .wysiwyg-host :deep(.mu-editor) { min-height: 100%; }
 </style>

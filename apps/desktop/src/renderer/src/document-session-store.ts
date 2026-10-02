@@ -40,6 +40,17 @@ function scheduleRecovery(session: DocumentSession): void {
 export const useDocumentSessionStore = defineStore('documents', {
   state: (): State => ({ sessions: {} }),
   actions: {
+    createUntitled(mode: DocumentMode = 'source'): DocumentSession {
+      const documentId = crypto.randomUUID()
+      const session = createUntitledDocumentSession({
+        id: documentId as DocumentId,
+        title: 'Untitled.md',
+        markdown: '',
+        mode
+      })
+      this.sessions[documentId] = session
+      return session
+    },
     open(dto: OpenDocumentDTO, mode: DocumentMode = 'preview'): DocumentSession {
       const file: FileBinding = {
         displayPath: dto.displayPath,

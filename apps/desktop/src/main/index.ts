@@ -1,5 +1,6 @@
-import { app, dialog, webContents } from 'electron'
+import { app, dialog, nativeTheme, webContents } from 'electron'
 import { join } from 'node:path'
+import { CHANNELS } from '@markhere/ipc-contract'
 import { MARKHERE_IDENTITY, MARKHERE_PRODUCT_NAME } from '@markhere/shared'
 import { AppLifecycle, getUserArgv } from './app-lifecycle'
 import { registerPrivilegedSchemes, installAppProtocolHandlers } from './protocols/app-protocol'
@@ -28,6 +29,11 @@ import { maybeWriteSecurityProbe } from './security/security-probe'
 import { ResourceCapabilityBroker } from './resources/resource-capability-broker'
 import { ResourceService } from './resources/resource-service'
 import { SettingsService } from './storage/settings-service'
+import { KeybindingService } from './storage/keybinding-service'
+import { WorkspaceCapabilityRegistry } from './workspace/workspace-capability-registry'
+import { WorkspaceWatchService } from './workspace/workspace-watch-service'
+import { WorkspaceSearchService } from './workspace/workspace-search-service'
+import { WorkspaceService } from './workspace/workspace-service'
 
 registerPrivilegedSchemes()
 app.enableSandbox()
@@ -48,7 +54,6 @@ async function boot(): Promise<void> {
   const resources = new ResourceService(fileCapabilities, selections, resourceBroker)
   installAppProtocolHandlers(undefined, resourceBroker)
   const recovery = new RecoveryService()
-  const settings = new SettingsService()
   const recents = new RecentDocumentStore()
   const sessionPersistence = new SessionPersistenceService()
   const closeCoordinator = new CloseCoordinator()
@@ -67,6 +72,7 @@ async function boot(): Promise<void> {
     })
   })
   let commands: ApplicationCommandRegistry | undefined
+  let workspace: WorkspaceService | undefined
   const files = new FileService({
     selections, files: fileCapabilities, watch, recents, resources: resourceBroker,
     onSaved: async (documentId, revision) => { await recovery.discardForDocument(documentId, revision) },
@@ -113,10 +119,38 @@ async function boot(): Promise<void> {
       resourceBroker.revokeAllForWebContents(webContentsId)
       for (const documentId of fileCapabilities.revokeAllForWebContents(webContentsId)) watch.unwatchDocument(documentId)
       commands?.clearContext(webContentsId)
+      void workspace?.revokeAllForWebContents(webContentsId)
       void sessionPersistence.save(windows.snapshotPersistedWindows())
     }
   })
   lifecycle.attachWindowManager(windows)
+
+  const settings = new SettingsService({
+    onChanged: (next) => {
+      nativeTheme.themeSource = next.appearance
+      for (const window of windows.list()) if (!window.isDestroyed()) events.send(window.webContents, CHANNELS.eventSettingsChanged, { settings: next })
+    }
+  })
+  const initialSettings = await settings.get()
+  if (initialSettings.ok) nativeTheme.themeSource = initialSettings.data.appearance
+
+  const keybindings = new KeybindingService({
+    onChanged: (config) => {
+      commands?.setKeybindings(config.bindings)
+      for (const window of windows.list()) if (!window.isDestroyed()) events.send(window.webContents, CHANNELS.eventKeybindingsChanged, { config })
+    }
+  })
+
+  const workspaceCapabilities = new WorkspaceCapabilityRegistry(capabilities)
+  const workspaceWatch = new WorkspaceWatchService((change) => {
+    const target = webContents.fromId(change.ownerWebContentsId)
+    if (target) events.send(target, CHANNELS.eventWorkspaceChange, { workspaceId: change.workspaceId, kind: change.kind, relativePath: change.relativePath })
+  })
+  const workspaceSearch = new WorkspaceSearchService({
+    onBatch: (ownerWebContentsId, event) => { const target = webContents.fromId(ownerWebContentsId); if (target) events.send(target, CHANNELS.eventWorkspaceSearchBatch, event) },
+    onCompleted: (ownerWebContentsId, event) => { const target = webContents.fromId(ownerWebContentsId); if (target) events.send(target, CHANNELS.eventWorkspaceSearchCompleted, event) }
+  })
+  workspace = new WorkspaceService({ selections, capabilities: workspaceCapabilities, files, recents, watch: workspaceWatch, search: workspaceSearch })
 
   const persistSession = async (): Promise<void> => {
     const currentSettings = await settings.get()
@@ -143,10 +177,14 @@ async function boot(): Promise<void> {
     resources,
     recovery,
     settings,
+    keybindings,
+    workspace,
     future: new FutureService()
   })
 
   commands = new ApplicationCommandRegistry(events, () => void lifecycle.requestQuit())
+  const initialKeybindings = await keybindings.get()
+  if (initialKeybindings.ok) commands.setKeybindings(initialKeybindings.data.bindings)
   installApplicationMenu(commands)
 
   await lifecycle.enqueueInitial(getUserArgv(process.argv, app.isPackaged), process.cwd())
