@@ -19,6 +19,7 @@ import { RendererCommandRegistry } from './command-registry'
 import { useWindowSessionStore } from './window-session-store'
 import { useDocumentSessionStore } from './document-session-store'
 import { useWorkspaceStore } from './workspace-store'
+import { userMessageForErrorCode } from './error-messages'
 import DocumentEditor from './components/DocumentEditor.vue'
 import WorkspaceTree from './components/WorkspaceTree.vue'
 import WorkspaceSearch from './components/WorkspaceSearch.vue'
@@ -53,6 +54,7 @@ const keybindings = ref<KeybindingConfig>(EMPTY_KEYBINDINGS)
 const recentFiles = ref<RecentItemDTO[]>([])
 const recentWorkspaces = ref<RecentItemDTO[]>([])
 const commandPaletteOpen = ref(false)
+const safeModeActive = ref(false)
 const exportDialogOpen = ref(false)
 const exportDialogFormat = ref<ExportJobKind>('pdf')
 const exportSnapshot = ref<ExportSnapshotRequestBase | null>(null)
@@ -73,6 +75,7 @@ let systemThemeListener: ((event: MediaQueryListEvent) => void) | null = null
 const activeDocument = computed(() => windowSession.activeDocumentId ? documents.sessions[windowSession.activeDocumentId] ?? null : null)
 const activeWorkspace = computed(() => workspaceStore.workspace)
 const tabSessions = computed(() => windowSession.tabIds.flatMap((id) => documents.sessions[id] ? [documents.sessions[id]!] : []))
+const errorMessage = computed(() => errorCode.value ? userMessageForErrorCode(errorCode.value) : null)
 const wordCount = computed(() => {
   const text = activeDocument.value?.buffer.markdown.trim() ?? ''
   return text ? text.split(/\s+/u).length : 0
@@ -99,13 +102,14 @@ function applyTheme(): void {
 }
 
 async function loadFoundationState(): Promise<void> {
-  const [info, platformInfo, settingsResult, bindingsResult, filesResult, workspacesResult] = await Promise.all([
+  const [info, platformInfo, settingsResult, bindingsResult, filesResult, workspacesResult, safeModeResult] = await Promise.all([
     window.markhere.app.getInfo(),
     window.markhere.app.getPlatformInfo(),
     window.markhere.settings.get(),
     window.markhere.settings.getKeybindings(),
     window.markhere.files.listRecent(),
-    window.markhere.workspaces.listRecent()
+    window.markhere.workspaces.listRecent(),
+    window.markhere.diagnostics.getSafeModeStatus()
   ])
   if (info.ok) appInfo.value = info.data
   if (platformInfo.ok) platform.value = platformInfo.data.platform
@@ -113,6 +117,7 @@ async function loadFoundationState(): Promise<void> {
   if (bindingsResult.ok) keybindings.value = bindingsResult.data
   if (filesResult.ok) recentFiles.value = filesResult.data
   if (workspacesResult.ok) recentWorkspaces.value = workspacesResult.data
+  if (safeModeResult.ok) safeModeActive.value = safeModeResult.data.active
   applyTheme()
 }
 
@@ -123,7 +128,7 @@ async function loadRecoveries(): Promise<void> {
 }
 
 function activateOpenedDocument(document: OpenDocumentDTO, anchor?: string): void {
-  if (!documents.sessions[document.documentId]) documents.open(document, settings.value.defaultMode)
+  if (!documents.sessions[document.documentId]) documents.open(document, document.markdown.length > 5 * 1024 * 1024 ? 'source' : settings.value.defaultMode)
   if (!windowSession.tabIds.includes(document.documentId)) windowSession.tabIds.push(document.documentId)
   windowSession.activeDocumentId = document.documentId
   requestedAnchor.value = anchor ?? null
@@ -477,7 +482,9 @@ onBeforeUnmount(() => {
       </aside>
 
       <section class="document-area" aria-label="Document area">
-        <div v-if="errorCode || notice" class="notification" :class="{ error: !!errorCode }" role="status"><span>{{ errorCode ?? notice }}</span><button type="button" aria-label="Dismiss message" @click="errorCode = null; notice = null">×</button></div>
+        <div v-if="errorCode || notice" class="notification" :class="{ error: !!errorCode }" role="status"><span>{{ errorMessage ?? notice }}</span><button type="button" aria-label="Dismiss message" @click="errorCode = null; notice = null">×</button></div>
+
+        <div v-if="safeModeActive" class="recovery-banner" role="status"><strong>Safe Mode</strong><span>Session restoration was skipped after repeated unclean startups. Your documents and recovery snapshots were not deleted.</span></div>
 
         <div v-if="recoverables.length" class="recovery-banner">
           <strong>Recovery snapshots available</strong>

@@ -19,7 +19,8 @@ export function sanitizeMarkdownHtml(unsafeHtml: string): string {
     USE_PROFILES: { html: true },
     FORBID_TAGS: RAW_PREVIEW_FORBIDDEN_TAGS,
     FORBID_ATTR: RAW_PREVIEW_FORBIDDEN_ATTRS,
-    ALLOW_DATA_ATTR: true,
+    ALLOW_DATA_ATTR: false,
+    SAFE_FOR_XML: true,
     SANITIZE_DOM: true,
     SANITIZE_NAMED_PROPS: true,
     KEEP_CONTENT: true
@@ -31,7 +32,8 @@ export function sanitizeKatexHtml(generatedHtml: string): string {
     USE_PROFILES: { html: true, svg: true, mathMl: true },
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'foreignObject'],
     FORBID_ATTR: ['onload', 'onclick', 'onerror', 'srcdoc'],
-    SANITIZE_DOM: true
+    SANITIZE_DOM: true,
+    SAFE_FOR_XML: true
   }))
 }
 
@@ -40,7 +42,8 @@ export function sanitizeMermaidSvg(generatedSvg: string): string {
     USE_PROFILES: { svg: true, svgFilters: true },
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'foreignObject'],
     FORBID_ATTR: ['onload', 'onclick', 'onerror', 'href', 'xlink:href'],
-    SANITIZE_DOM: true
+    SANITIZE_DOM: true,
+    SAFE_FOR_XML: true
   }))
 
   // DOMPurify deliberately does not sanitize CSS. Mermaid legitimately emits

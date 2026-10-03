@@ -27,6 +27,7 @@ import type { SettingsService } from '../storage/settings-service'
 import type { KeybindingService } from '../storage/keybinding-service'
 import type { WorkspaceService } from '../workspace/workspace-service'
 import type { ExportCoordinator } from '../export/export-coordinator'
+import type { DiagnosticService } from '../diagnostics/diagnostic-service'
 import type { SelectionTokenKind, SelectionTokenStore } from '../services/selection-token-store'
 import { failure } from '../services/api-results'
 import { registerValidatedInvoke, registerValidatedSend } from './validated-ipc'
@@ -47,6 +48,7 @@ export interface IpcServices {
   readonly keybindings: KeybindingService
   readonly workspace: WorkspaceService
   readonly exports: ExportCoordinator
+  readonly diagnostics: DiagnosticService
   readonly future: FutureService
 }
 
@@ -158,6 +160,9 @@ export function registerIpcHandlers(services: IpcServices): void {
   registerValidatedInvoke(trusted, CHANNELS.resourceResolveLink, (_event, sender, request) =>
     ownedOrFailure<ResolvedDocumentLink>(capabilities, request.documentId, 'document', sender.webContentsId)
       ?? services.resources.resolveLink(request, sender.webContentsId))
+  registerValidatedInvoke(trusted, CHANNELS.resourceApproveRemoteImages, (_event, sender, request) =>
+    ownedOrFailure<{ approved: number }>(capabilities, request.documentId, 'document', sender.webContentsId)
+      ?? services.resources.approveRemoteImages(request, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.resourceImportLocalImage, (_event, sender, request) =>
     ownedOrFailure<ImportedImageResult>(capabilities, request.documentId, 'document', sender.webContentsId)
       ?? services.future.unavailable('resources.importLocalImage'))
@@ -203,6 +208,12 @@ export function registerIpcHandlers(services: IpcServices): void {
   registerValidatedInvoke(trusted, CHANNELS.updateDownload, () => services.future.unavailable<void>('updates.download'))
   registerValidatedInvoke(trusted, CHANNELS.updateInstallAndRestart, () => services.future.unavailable<void>('updates.installAndRestart'))
   registerValidatedInvoke(trusted, CHANNELS.updateGetStatus, () => services.future.unavailable<UpdateStatus>('updates.getStatus'))
+
+  registerValidatedInvoke(trusted, CHANNELS.diagnosticsGetSafeModeStatus, () => services.diagnostics.getSafeModeStatus())
+  registerValidatedInvoke(trusted, CHANNELS.diagnosticsCreateBundle, () => services.diagnostics.createBundle())
+  registerValidatedInvoke(trusted, CHANNELS.diagnosticsOpenLogsFolder, () => services.diagnostics.openLogsFolder())
+  registerValidatedInvoke(trusted, CHANNELS.diagnosticsClearLogs, () => services.diagnostics.clearLogs())
+  registerValidatedInvoke(trusted, CHANNELS.diagnosticsReportRendererFault, (_event, sender, report) => services.diagnostics.reportRendererFault(report, sender.windowId))
 }
 
 export function attachWindowStateEvents(

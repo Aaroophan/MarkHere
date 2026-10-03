@@ -1,0 +1,7 @@
+../secret.md
+..\secret.md
+%2e%2e/secret.md
+%252e%252e/secret.md
+\\server\share\secret.md
+\\?\C:\secret.md
+C:\secret.md

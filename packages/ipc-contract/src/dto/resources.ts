@@ -19,3 +19,8 @@ export interface ImportLocalImageRequest {
   readonly selectionToken: string
   readonly preferredName?: string
 }
+
+export interface ApproveRemoteImagesRequest {
+  readonly documentId: string
+  readonly urls: readonly string[]
+}

@@ -100,7 +100,7 @@ if (!sessions.includes('setPermissionCheckHandler(() => false)')) violations.pus
 if (!sessions.includes('callback(false)')) violations.push('permission requests must fail closed')
 
 const shell = await text('apps/desktop/src/main/services/shell-service.ts')
-if (!shell.includes('classifyExternalUrl')) violations.push('shell service must use central URL policy')
+if (!shell.includes('SecurityPolicy') || !shell.includes('mayOpenExternalUrl')) violations.push('shell service must use central URL policy')
 if (shell.includes('shell.openExternal(rawUrl)')) violations.push('shell must not launch raw renderer URL input')
 
 const ipcContract = await text('packages/ipc-contract/src/internal-channels.ts')

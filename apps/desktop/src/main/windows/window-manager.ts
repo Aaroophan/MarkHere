@@ -25,6 +25,7 @@ export interface WindowManagerOptions {
   readonly onWindowState?: (window: BrowserWindow) => void
   readonly onWindowCreated?: (window: BrowserWindow, appWindowId: string) => void
   readonly onRendererReady?: (webContentsId: number) => void
+  readonly onRendererCrashed?: (webContentsId: number, reason: string) => void
   readonly onWindowDestroyed?: (webContentsId: number) => void
 }
 
@@ -46,6 +47,7 @@ export class WindowManager {
   readonly #onWindowState: ((window: BrowserWindow) => void) | undefined
   readonly #onWindowCreated: ((window: BrowserWindow, appWindowId: string) => void) | undefined
   readonly #onRendererReady: ((webContentsId: number) => void) | undefined
+  readonly #onRendererCrashed: ((webContentsId: number, reason: string) => void) | undefined
   readonly #onWindowDestroyed: ((webContentsId: number) => void) | undefined
   #sessionSecurityInstalled = false
 
@@ -58,6 +60,7 @@ export class WindowManager {
     this.#onWindowState = options.onWindowState
     this.#onWindowCreated = options.onWindowCreated
     this.#onRendererReady = options.onRendererReady
+    this.#onRendererCrashed = options.onRendererCrashed
     this.#onWindowDestroyed = options.onWindowDestroyed
   }
 
@@ -208,6 +211,11 @@ export class WindowManager {
       this.#onRendererReady?.(webContentsId)
       window.show()
       this.emitWindowState(window)
+    })
+
+    window.webContents.on('render-process-gone', (_event, details) => {
+      this.#onRendererCrashed?.(webContentsId, details.reason)
+      if (!window.isDestroyed()) window.destroy()
     })
 
     window.on('maximize', () => this.emitWindowState(window))

@@ -4,6 +4,8 @@ export type ErrorCategory =
   | 'validation'
   | 'filesystem'
   | 'conflict'
+  | 'markdown'
+  | 'render'
   | 'security'
   | 'workspace'
   | 'export'

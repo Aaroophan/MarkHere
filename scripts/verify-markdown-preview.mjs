@@ -63,7 +63,7 @@ if (!broker.includes("scopeId") || !broker.includes("ownerWebContentsId")) viola
 if (!broker.includes('ownsProtocolRequest')) violations.push('resource broker must expose an owner-bound protocol request check')
 if (!fileService.includes('this.#resources.bindDocument')) violations.push('opened documents must receive a real resource scope')
 if (!fileService.includes('this.#resources.rebindDocument')) violations.push('Save As/rename must rebind resource scope')
-if (!resourceService.includes('classifyExternalUrl')) violations.push('document links must use central URL policy')
+if (!(resourceService.includes('classifyExternalUrl') || (resourceService.includes('SecurityPolicy') && resourceService.includes('mayOpenExternalUrl')))) violations.push('document links must use central URL policy')
 if (!resourceService.includes("this.#selections.issue('document-open'")) violations.push('local document links must route through FileService selection capability')
 if (!ipc.includes('services.resources.resolveLink')) violations.push('resource resolveLink IPC must be live')
 if (!renderer.includes('PreviewRenderCoordinator(150)')) violations.push('renderer preview must use the cancellable coordinator')

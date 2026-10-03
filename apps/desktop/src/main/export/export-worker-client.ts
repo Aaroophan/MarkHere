@@ -35,7 +35,7 @@ export class ExportWorkerClient {
         callback()
       }
       const onAbort = (): void => finish(() => reject(new DOMException('Export cancelled.', 'AbortError')))
-      const timer = setTimeout(() => finish(() => reject(new Error('Export worker timed out.'))), timeoutMs)
+      const timer = setTimeout(() => finish(() => reject(new Error('EXPORT_WORKER_TIMEOUT: export worker timed out.'))), timeoutMs)
       timer.unref?.()
       signal.addEventListener('abort', onAbort, { once: true })
       child.on('message', (message: ExportWorkerResponse) => {
@@ -44,7 +44,7 @@ export class ExportWorkerClient {
         else finish(() => resolve(message))
       })
       child.on('exit', (code) => {
-        if (!settled && code !== 0) finish(() => reject(new Error(`Export worker exited with code ${code}.`)))
+        if (!settled && code !== 0) finish(() => reject(new Error(`EXPORT_WORKER_EXITED: export worker exited with code ${code}.`)))
       })
       child.on('spawn', () => {
         const payload = { ...request, requestId } as ExportWorkerRequest

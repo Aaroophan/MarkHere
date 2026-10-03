@@ -1,13 +1,14 @@
 import { stat } from 'node:fs/promises'
 import { dirname, extname, isAbsolute, resolve } from 'node:path'
-import type { ApiResult, ResolveDocumentLinkRequest, ResolvedDocumentLink } from '@markhere/ipc-contract'
+import type { ApiResult, ApproveRemoteImagesRequest, ResolveDocumentLinkRequest, ResolvedDocumentLink } from '@markhere/ipc-contract'
 import { normalizeHeadingFragment } from '@markhere/markdown-engine'
-import { classifyExternalUrl } from '@markhere/security-core'
+import { SecurityPolicy } from '@markhere/security-core'
 import type { FileCapabilityRecord, FileCapabilityRegistry } from '../documents/file-capability-registry'
 import { identifyExistingPath, sameKnownPath } from '../documents/path-identity'
 import type { SelectionTokenStore } from '../services/selection-token-store'
 import { failure, ok } from '../services/api-results'
 import type { ResourceCapabilityBroker } from './resource-capability-broker'
+import type { RemoteResourceApprovalRegistry } from '../security/remote-resource-approval-registry'
 
 const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown', '.mmd', '.mdown', '.mdtext', '.mdtxt', '.mdx'])
 const WINDOWS_ABSOLUTE = /^[A-Za-z]:[\\/]/
@@ -35,11 +36,15 @@ export class ResourceService {
   readonly #files: FileCapabilityRegistry
   readonly #selections: SelectionTokenStore
   readonly #broker: ResourceCapabilityBroker
+  readonly #remoteApprovals: RemoteResourceApprovalRegistry
+  readonly #policy: SecurityPolicy
 
-  constructor(files: FileCapabilityRegistry, selections: SelectionTokenStore, broker: ResourceCapabilityBroker) {
+  constructor(files: FileCapabilityRegistry, selections: SelectionTokenStore, broker: ResourceCapabilityBroker, remoteApprovals: RemoteResourceApprovalRegistry, policy: SecurityPolicy) {
     this.#files = files
     this.#selections = selections
     this.#broker = broker
+    this.#remoteApprovals = remoteApprovals
+    this.#policy = policy
   }
 
   async resolveLink(request: ResolveDocumentLinkRequest, ownerWebContentsId: number): Promise<ApiResult<ResolvedDocumentLink>> {
@@ -58,7 +63,7 @@ export class ResourceService {
     // never mistaken for an external URL scheme.
     const looksWindowsPath = WINDOWS_ABSOLUTE.test(raw)
     if (!looksWindowsPath) {
-      const external = classifyExternalUrl(raw)
+      const external = this.#policy.mayOpenExternalUrl(raw)
       if (external.decision === 'allow') return ok({ kind: 'external', url: external.normalizedUrl })
       if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(raw)) {
         return ok({ kind: 'blocked', reason: external.reason })
@@ -88,6 +93,13 @@ export class ResourceService {
     } catch {
       return ok({ kind: 'blocked', reason: 'document-not-found' })
     }
+  }
+
+
+  approveRemoteImages(request: ApproveRemoteImagesRequest, ownerWebContentsId: number): ApiResult<{ approved: number }> {
+    try { this.#files.get(request.documentId, ownerWebContentsId, 'read') }
+    catch { return failure('SEC_CAPABILITY_NOT_OWNED', 'security', 'error.capabilityNotOwned', false) }
+    return ok({ approved: this.#remoteApprovals.approve(request.documentId, ownerWebContentsId, request.urls) })
   }
 
   invalidateDocumentCache(documentId: string, ownerWebContentsId: number): void {

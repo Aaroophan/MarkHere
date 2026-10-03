@@ -31,3 +31,7 @@ MarkText remains an architectural and behavioral reference. The MarkText MIT lic
 ## Generated release notices
 
 Package-level third-party notices and the CycloneDX SBOM are generated from the production dependency graph by `node scripts/compliance.mjs all` once the dependency lockfile is available. This hand-maintained notice is an architecture/provenance summary, not a substitute for lockfile-derived notices shipped with a release.
+
+## jsdom (test-only)
+
+Security sanitizer regression tests use exact development dependency **jsdom 30.1.1** (MIT) to exercise DOMPurify against hostile HTML/SVG in a browser-like DOM during automated tests. It is not a MarkHere production runtime dependency and should not be packaged into release application code.

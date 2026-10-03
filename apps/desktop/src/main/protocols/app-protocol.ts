@@ -3,6 +3,7 @@ import { readFile, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { MARKHERE_IDENTITY } from '@markhere/shared'
+import { SecurityPolicy } from '@markhere/security-core'
 import type { ResourceCapabilityBroker } from '../resources/resource-capability-broker'
 import type { PrintDocumentStore } from '../export/print-document-store'
 import { resolveAppProtocolRequest } from './app-protocol-path'
@@ -80,8 +81,10 @@ function resourceHeaders(mimeType: string, svg: boolean): Headers {
 export function installAppProtocolHandlers(
   rendererRoot = getPackagedRendererRoot(),
   resources?: ResourceCapabilityBroker,
-  printDocuments?: PrintDocumentStore
+  printDocuments?: PrintDocumentStore,
+  options: { policy?: SecurityPolicy; remoteResourcePolicy?: () => 'block' | 'ask' | 'allow-https'; isRemoteImageApproved?: (url: string, ownerWebContentsId: number) => boolean } = {}
 ): void {
+  const securityPolicy = options.policy ?? new SecurityPolicy()
   // Electron's ProtocolRequest intentionally does not expose the requesting
   // WebContents. Enforce capability ownership one layer earlier through the
   // default session's webRequest metadata, which supplies webContentsId and
@@ -117,7 +120,15 @@ export function installAppProtocolHandlers(
         }
         try {
           const target = new URL(details.url)
-          callback({ cancel: developmentOrigin === null || target.origin !== developmentOrigin })
+          if (developmentOrigin !== null && target.origin === developmentOrigin) { callback({ cancel: false }); return }
+          if (details.resourceType === 'image') {
+            const configured = options.remoteResourcePolicy?.() ?? 'block'
+            const approved = configured === 'ask' && typeof ownerWebContentsId === 'number' && options.isRemoteImageApproved?.(details.url, ownerWebContentsId)
+            const decision = securityPolicy.mayLoadRemoteImage(details.url, approved ? 'allow-https' : configured)
+            callback({ cancel: decision.decision !== 'allow' })
+            return
+          }
+          callback({ cancel: true })
         } catch { callback({ cancel: true }) }
         return
       }
@@ -167,6 +178,9 @@ export function installAppProtocolHandlers(
       const headers = new Headers(response.headers)
       headers.set('content-type', resolution.mimeType)
       headers.set('x-content-type-options', 'nosniff')
+      if (resolution.mimeType === 'text/html; charset=utf-8') {
+        headers.set('content-security-policy', "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' markhere-resource: data: https:; font-src 'self' markhere-resource: data:; connect-src 'self'; media-src 'self' markhere-resource:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'")
+      }
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,

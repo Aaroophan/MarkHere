@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { SECURITY_BUDGETS } from '@markhere/security-core'
 import type {
   ApiResult,
   DocxExportOptions as IpcDocxOptions,
@@ -100,6 +101,7 @@ export class ExportCoordinator {
   async initialize(): Promise<void> { await this.#temp.initialize() }
 
   start(request: StartExportRequest, ownerWebContentsId: number): ApiResult<{ jobId: string }> {
+    if (this.#pendingForOwner(ownerWebContentsId) >= SECURITY_BUDGETS.maxConcurrentExportsPerWindow) return failure('EXPORT_TOO_MANY_JOBS', 'export', 'error.exportTooManyJobs', true)
     const authorization = this.#authorizeSnapshot(request.documentId, request.resourceScopeId, ownerWebContentsId)
     if (authorization) return authorization
     let targetPath: string
@@ -112,6 +114,7 @@ export class ExportCoordinator {
   }
 
   print(request: PrintRequest, ownerWebContentsId: number): ApiResult<{ jobId: string }> {
+    if (this.#pendingForOwner(ownerWebContentsId) >= SECURITY_BUDGETS.maxConcurrentExportsPerWindow) return failure('EXPORT_TOO_MANY_JOBS', 'export', 'error.exportTooManyJobs', true)
     const authorization = this.#authorizeSnapshot(request.documentId, request.resourceScopeId, ownerWebContentsId)
     if (authorization) return authorization
     const job = this.#createJob('print', request, undefined, request.options, ownerWebContentsId)
@@ -144,6 +147,12 @@ export class ExportCoordinator {
     for (const job of this.#jobs.values()) if (!['completed', 'failed', 'cancelled'].includes(job.status)) job.controller.abort()
     this.#worker.closeAll()
     this.#printSurface.closeAll()
+  }
+
+  #pendingForOwner(ownerWebContentsId: number): number {
+    let count = 0
+    for (const job of this.#jobs.values()) if (job.ownerWebContentsId === ownerWebContentsId && !['completed', 'failed', 'cancelled'].includes(job.status)) count += 1
+    return count
   }
 
   #authorizeSnapshot(documentId: string, resourceScopeId: string | undefined, ownerWebContentsId: number): ApiResult<{ jobId: string }> | null {

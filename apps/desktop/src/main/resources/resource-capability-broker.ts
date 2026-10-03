@@ -62,9 +62,11 @@ export class ResourceCapabilityBroker {
   readonly #scopes = new Map<string, ResourceScopeRecord>()
   readonly #scopeByDocument = new Map<string, string>()
   readonly #cache = new Map<string, ResolvedLocalResource>()
+  readonly #onDocumentRevoked: ((documentId: string) => void) | undefined
 
-  constructor(ownership: CapabilityOwnershipRegistry) {
+  constructor(ownership: CapabilityOwnershipRegistry, onDocumentRevoked?: (documentId: string) => void) {
     this.#ownership = ownership
+    this.#onDocumentRevoked = onDocumentRevoked
   }
 
   bindDocument(documentId: string, ownerWebContentsId: number, documentDirectory: string): string {
@@ -237,6 +239,7 @@ export class ResourceCapabilityBroker {
     if (!record) return
     this.#scopes.delete(scopeId)
     this.#scopeByDocument.delete(record.documentId)
+    this.#onDocumentRevoked?.(record.documentId)
     this.#clearScopeCache(scopeId)
     this.#ownership.revoke(scopeId)
   }

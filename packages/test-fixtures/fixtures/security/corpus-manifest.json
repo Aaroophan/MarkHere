@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "reviewRequiredToModify": true,
+  "fixtures": [
+    {
+      "path": "malicious-html.md",
+      "sha256": "feccbf83b9aa7d8d344a315397e130c71e2730e88365f072aa4da18c0b0df1ef"
+    },
+    {
+      "path": "malicious-svg.svg",
+      "sha256": "e7bdaaf7f0b1bf7a40c0b6244069e190674300b741b3b35e3010a078b80ea361"
+    },
+    {
+      "path": "malicious-mermaid.md",
+      "sha256": "598d5b6cde42996fe7773c3aabf5c65f3e144d4af34c9f3793fc9799998364cc"
+    },
+    {
+      "path": "path-traversal.txt",
+      "sha256": "c2cd94d4731b00ccd471315c92ac87b099ac7c63b3ad31a755781e59fef49b0b"
+    }
+  ]
+}

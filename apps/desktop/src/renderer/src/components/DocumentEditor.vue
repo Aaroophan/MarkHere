@@ -2,6 +2,7 @@
 import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import type { DocumentMode, StructuralAnchor } from '@markhere/document-model'
 import type { MarkHereSettings, OpenDocumentDTO } from '@markhere/ipc-contract'
+import { parseMarkdown } from '@markhere/markdown-engine'
 import { MuyaWysiwygEditorAdapter, WysiwygRoundTripUnsafeError, type WysiwygSelectionSnapshot } from '@markhere/editor-core'
 import { ALL_MODE_TRANSITIONS, EDITOR_COMMAND_DEFINITIONS, ModeController, type EditorCommandId, type EditorFlushResult, type EditorNavigationSnapshot } from '@markhere/editor-session'
 import { SourceEditorAdapter, type SourceEditorSelectionSnapshot } from '@markhere/source-editor'
@@ -42,6 +43,15 @@ const wysiwygSearchQuery = ref('')
 const wysiwygReplaceValue = ref('')
 const remoteImagesApproved = ref(false)
 const remoteImagesAllowed = computed(() => currentSettings.value.remoteResources === 'allow-https' || (currentSettings.value.remoteResources === 'ask' && remoteImagesApproved.value))
+
+async function approveRemoteImagesForDocument(): Promise<void> {
+  const parsed = parseMarkdown({ markdown: session.value.buffer.markdown, revision: session.value.buffer.revision })
+  const urls = [...new Set(parsed.resources.filter((resource) => resource.kind === 'image' && resource.target.startsWith('https://')).map((resource) => resource.target))]
+  if (urls.length === 0) { remoteImagesApproved.value = true; return }
+  const result = await window.markhere.resources.approveRemoteImages({ documentId: props.documentId, urls })
+  if (!result.ok) { emit('error', result.error.code); return }
+  remoteImagesApproved.value = result.data.approved > 0
+}
 let controller: ModeController | null = null
 let syncGuard = false
 let dividerCleanup: (() => void) | null = null
@@ -451,7 +461,7 @@ defineExpose({ transition, flushActiveEditable, executeEditorCommand, undo, redo
 
     <div v-if="currentSettings.remoteResources === 'ask' && !remoteImagesApproved && (renderMode === 'preview' || renderMode === 'split')" class="remote-resource-prompt" role="status">
       <span>Remote HTTPS images are blocked for this document.</span>
-      <button type="button" @click="remoteImagesApproved = true">Load remote images</button>
+      <button type="button" @click="approveRemoteImagesForDocument">Load remote images</button>
     </div>
 
     <div v-show="renderMode === 'wysiwyg'" class="editor-pane wysiwyg-pane">

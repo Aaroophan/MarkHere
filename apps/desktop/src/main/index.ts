@@ -1,7 +1,8 @@
-import { app, dialog, nativeTheme, webContents } from 'electron'
+import { app, crashReporter, dialog, nativeTheme, webContents } from 'electron'
 import { join } from 'node:path'
 import { CHANNELS } from '@markhere/ipc-contract'
 import { MARKHERE_IDENTITY, MARKHERE_PRODUCT_NAME } from '@markhere/shared'
+import { SecurityPolicy } from '@markhere/security-core'
 import { AppLifecycle, getUserArgv } from './app-lifecycle'
 import { registerPrivilegedSchemes, installAppProtocolHandlers } from './protocols/app-protocol'
 import { TrustedWebContentsRegistry } from './security/trusted-web-contents-registry'
@@ -40,11 +41,18 @@ import { ExportWorkerClient } from './export/export-worker-client'
 import { PdfPrintSurface } from './export/pdf-print-surface'
 import { ExportCoordinator } from './export/export-coordinator'
 import { PrintDocumentStore } from './export/print-document-store'
+import { LocalLogger } from './logging/local-logger'
+import { CrashHealthService } from './diagnostics/crash-health-service'
+import { DiagnosticService } from './diagnostics/diagnostic-service'
+import { IpcAbuseProtector } from './security/ipc-abuse-protector'
+import { RemoteResourceApprovalRegistry } from './security/remote-resource-approval-registry'
+import { configureValidatedIpcSecurity } from './ipc/validated-ipc'
 
 registerPrivilegedSchemes()
 app.enableSandbox()
 app.setName(MARKHERE_PRODUCT_NAME)
 app.setPath('userData', join(app.getPath('appData'), MARKHERE_IDENTITY.userDataFolder))
+crashReporter.start({ productName: MARKHERE_PRODUCT_NAME, uploadToServer: false, globalExtra: { privacyMode: 'local-only' } })
 
 const lifecycle = new AppLifecycle()
 const ownsSingleInstance = lifecycle.initializeEarly()
@@ -52,14 +60,30 @@ const ownsSingleInstance = lifecycle.initializeEarly()
 async function boot(): Promise<void> {
   await app.whenReady()
 
+  const logger = new LocalLogger('main')
+  const securityPolicy = new SecurityPolicy()
+  const crashHealth = new CrashHealthService()
+  const safeMode = await crashHealth.markStarting()
+  configureValidatedIpcSecurity({ logger, abuseProtector: new IpcAbuseProtector() })
+  logger.info('application.starting', { metadata: { safeMode, packaged: app.isPackaged } })
+  process.on('uncaughtException', () => {
+    logger.fatal('main.uncaught-exception', { errorCode: 'MAIN_UNCAUGHT_EXCEPTION' })
+    void logger.flush().finally(() => app.exit(1))
+  })
+  process.on('unhandledRejection', () => {
+    logger.error('main.unhandled-rejection', { errorCode: 'MAIN_UNHANDLED_REJECTION' })
+  })
+
   const trusted = new TrustedWebContentsRegistry()
   const capabilities = new CapabilityOwnershipRegistry()
   const selections = new SelectionTokenStore()
   const fileCapabilities = new FileCapabilityRegistry(capabilities)
-  const resourceBroker = new ResourceCapabilityBroker(capabilities)
+  const remoteApprovals = new RemoteResourceApprovalRegistry()
+  const resourceBroker = new ResourceCapabilityBroker(capabilities, (documentId) => remoteApprovals.revokeDocument(documentId))
   const printDocuments = new PrintDocumentStore()
-  const resources = new ResourceService(fileCapabilities, selections, resourceBroker)
-  installAppProtocolHandlers(undefined, resourceBroker, printDocuments)
+  const resources = new ResourceService(fileCapabilities, selections, resourceBroker, remoteApprovals, securityPolicy)
+  let remoteResourcePolicy: 'block' | 'ask' | 'allow-https' = 'block'
+  installAppProtocolHandlers(undefined, resourceBroker, printDocuments, { policy: securityPolicy, remoteResourcePolicy: () => remoteResourcePolicy, isRemoteImageApproved: (url, ownerWebContentsId) => remoteApprovals.isApproved(url, ownerWebContentsId) })
   const recovery = new RecoveryService()
   const recents = new RecentDocumentStore()
   const sessionPersistence = new SessionPersistenceService()
@@ -121,11 +145,16 @@ async function boot(): Promise<void> {
         return 'deny'
       })
     },
+    onRendererCrashed: (webContentsId, reason) => {
+      logger.error('renderer.process.gone', { errorCode: 'RENDERER_PROCESS_GONE', metadata: { webContentsId, reason } })
+      setTimeout(() => { if (windows.list().length === 0) windows.createEditorWindow() }, 250).unref()
+    },
     onRendererReady: (webContentsId) => lifecycle.markRendererReady(webContentsId),
     onWindowDestroyed: (webContentsId) => {
       exportCoordinator?.cancelAllForWebContents(webContentsId)
       selections.revokeAllForWebContents(webContentsId)
       resourceBroker.revokeAllForWebContents(webContentsId)
+      remoteApprovals.revokeAllForWebContents(webContentsId)
       for (const documentId of fileCapabilities.revokeAllForWebContents(webContentsId)) watch.unwatchDocument(documentId)
       commands?.clearContext(webContentsId)
       void workspace?.revokeAllForWebContents(webContentsId)
@@ -136,12 +165,13 @@ async function boot(): Promise<void> {
 
   const settings = new SettingsService({
     onChanged: (next) => {
+      remoteResourcePolicy = next.remoteResources
       nativeTheme.themeSource = next.appearance
       for (const window of windows.list()) if (!window.isDestroyed()) events.send(window.webContents, CHANNELS.eventSettingsChanged, { settings: next })
     }
   })
   const initialSettings = await settings.get()
-  if (initialSettings.ok) nativeTheme.themeSource = initialSettings.data.appearance
+  if (initialSettings.ok) { remoteResourcePolicy = initialSettings.data.remoteResources; nativeTheme.themeSource = initialSettings.data.appearance }
 
   const keybindings = new KeybindingService({
     onChanged: (config) => {
@@ -187,9 +217,10 @@ async function boot(): Promise<void> {
   }
   const sessionTimer = setInterval(() => { void persistSession() }, 5_000)
   sessionTimer.unref()
-  app.once('before-quit', () => { clearInterval(sessionTimer); exportCoordinator?.shutdown(); void persistSession() })
+  app.once('before-quit', () => { clearInterval(sessionTimer); exportCoordinator?.shutdown(); void persistSession(); void crashHealth.markCleanShutdown(); void logger.flush() })
 
   const appService = new AppService(windows, () => lifecycle.requestQuit())
+  const diagnostics = new DiagnosticService(logger, crashHealth)
   registerIpcHandlers({
     trusted,
     capabilities,
@@ -197,7 +228,7 @@ async function boot(): Promise<void> {
     app: appService,
     window: new WindowService(windows),
     dialogs: new DialogService(selections),
-    shell: new ShellService(),
+    shell: new ShellService(securityPolicy),
     clipboard: new ClipboardService(),
     files,
     resources,
@@ -206,6 +237,7 @@ async function boot(): Promise<void> {
     keybindings,
     workspace,
     exports: exportCoordinator,
+    diagnostics,
     future: new FutureService()
   })
 
@@ -215,10 +247,12 @@ async function boot(): Promise<void> {
   installApplicationMenu(commands)
 
   await lifecycle.enqueueInitial(getUserArgv(process.argv, app.isPackaged), process.cwd())
-  const persisted = await sessionPersistence.load()
+  const persisted = safeMode ? { schemaVersion: 1 as const, windows: [] } : await sessionPersistence.load()
   const restored = persisted.windows[0]
   const firstWindow = windows.createEditorWindow(restored?.bounds)
   firstWindow.webContents.once('did-finish-load', () => {
+    void crashHealth.markHealthy()
+    logger.info('application.renderer-ready', { metadata: { safeMode } })
     void maybeWriteSecurityProbe(firstWindow).then(() => {
       if (process.env.MARKHERE_SECURITY_PROBE_FILE) void lifecycle.requestQuit()
     })
@@ -226,9 +260,5 @@ async function boot(): Promise<void> {
 }
 
 if (ownsSingleInstance) {
-  void boot().catch((error: unknown) => {
-    // Issue 8 replaces this final bootstrap path with structured redacted logs.
-    console.error('MarkHere bootstrap failed', error instanceof Error ? error.message : 'unknown error')
-    app.exit(1)
-  })
+  void boot().catch(() => { app.exit(1) })
 }

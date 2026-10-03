@@ -1,6 +1,7 @@
 import type { ApiResult, SelectedPath, SettingsSection } from './dto/common'
 import type { AppInfo, PlatformInfo } from './dto/app'
 import type { ClipboardImageDTO, RichClipboardRequest } from './dto/clipboard'
+import type { DiagnosticBundleDTO, RendererFaultReport, SafeModeStatusDTO } from './dto/diagnostics'
 import type {
   ConfirmDialogRequest,
   ConfirmDialogResult,
@@ -20,6 +21,7 @@ import type {
 } from './dto/files'
 import type { ExportJobDTO, PrintRequest, StartExportRequest } from './dto/export'
 import type {
+  ApproveRemoteImagesRequest,
   ImportLocalImageRequest,
   ResolveDocumentLinkRequest,
   ResolvedDocumentLink
@@ -107,6 +109,7 @@ export const CHANNELS = Object.freeze({
   resourceResolveLink: 'mh:v1:resource:resolve-link',
   resourceImportLocalImage: 'mh:v1:resource:import-local-image',
   resourceInvalidateDocumentCache: 'mh:v1:resource:invalidate-document-cache',
+  resourceApproveRemoteImages: 'mh:v1:resource:approve-remote-images',
   settingsGet: 'mh:v1:settings:get',
   settingsUpdate: 'mh:v1:settings:update',
   settingsReset: 'mh:v1:settings:reset',
@@ -130,6 +133,11 @@ export const CHANNELS = Object.freeze({
   updateDownload: 'mh:v1:update:download',
   updateInstallAndRestart: 'mh:v1:update:install-and-restart',
   updateGetStatus: 'mh:v1:update:get-status',
+  diagnosticsGetSafeModeStatus: 'mh:v1:diagnostics:get-safe-mode-status',
+  diagnosticsCreateBundle: 'mh:v1:diagnostics:create-bundle',
+  diagnosticsOpenLogsFolder: 'mh:v1:diagnostics:open-logs-folder',
+  diagnosticsClearLogs: 'mh:v1:diagnostics:clear-logs',
+  diagnosticsReportRendererFault: 'mh:v1:diagnostics:report-renderer-fault',
   eventDocumentExternalChange: 'mh:v1:event:document-external-change',
   eventWorkspaceChange: 'mh:v1:event:workspace-change',
   eventWorkspaceSearchBatch: 'mh:v1:event:workspace-search-batch',
@@ -186,6 +194,7 @@ export interface InvokeChannelMap {
   [CHANNELS.workspaceSearch]: { args: [request: SearchRequest]; result: ApiResult<{ searchId: string }> }
   [CHANNELS.resourceResolveLink]: { args: [request: ResolveDocumentLinkRequest]; result: ApiResult<ResolvedDocumentLink> }
   [CHANNELS.resourceImportLocalImage]: { args: [request: ImportLocalImageRequest]; result: ApiResult<ImportedImageResult> }
+  [CHANNELS.resourceApproveRemoteImages]: { args: [request: ApproveRemoteImagesRequest]; result: ApiResult<{ approved: number }> }
   [CHANNELS.settingsGet]: { args: []; result: ApiResult<MarkHereSettings> }
   [CHANNELS.settingsUpdate]: { args: [patch: SettingsPatch]; result: ApiResult<MarkHereSettings> }
   [CHANNELS.settingsReset]: { args: [section?: SettingsSection]; result: ApiResult<MarkHereSettings> }
@@ -208,6 +217,11 @@ export interface InvokeChannelMap {
   [CHANNELS.updateDownload]: { args: []; result: ApiResult<void> }
   [CHANNELS.updateInstallAndRestart]: { args: []; result: ApiResult<void> }
   [CHANNELS.updateGetStatus]: { args: []; result: ApiResult<UpdateStatus> }
+  [CHANNELS.diagnosticsGetSafeModeStatus]: { args: []; result: ApiResult<SafeModeStatusDTO> }
+  [CHANNELS.diagnosticsCreateBundle]: { args: []; result: ApiResult<DiagnosticBundleDTO> }
+  [CHANNELS.diagnosticsOpenLogsFolder]: { args: []; result: ApiResult<void> }
+  [CHANNELS.diagnosticsClearLogs]: { args: []; result: ApiResult<void> }
+  [CHANNELS.diagnosticsReportRendererFault]: { args: [report: RendererFaultReport]; result: ApiResult<void> }
 }
 
 export interface SendChannelMap {

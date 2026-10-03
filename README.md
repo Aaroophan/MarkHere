@@ -13,6 +13,7 @@ This repository implements:
 - **Issue 5 — Implement Source, WYSIWYG, Preview, and Split Editing as Four First-Class Modes**
 - **Issue 6 — Implement the MarkHere Desktop Workspace, Navigation, Settings, Themes, Accessibility, and Productivity Features**
 - **Issue 7 — Implement the Unified Export Architecture for HTML, PDF, DOCX, and Printing**
+- **Issue 8 — Implement Security Enforcement, Error Handling, Logging, Crash Recovery, Privacy, and Operational Hardening**
 
 The 11 architecture documents in `docs/01-...` through `docs/11-...` are normative. `docs/12-implementation-plan,md` is the implementation backlog derived from them. When implementation and architecture disagree, resolve the architecture conflict explicitly rather than silently weakening a boundary.
 
@@ -91,6 +92,13 @@ See:
 - `docs/development/issue-07-implementation.md`
 - `docs/development/issue-07-validation.md`
 
+
+## Issue 8 security and operational hardening
+
+Issue 8 centralizes security decisions in `@markhere/security-core`, enforces CSP/navigation/network policy in main, bounds and rate-limits privileged IPC, tightens DOMPurify/SVG handling, adds structured stable error categories, and introduces content-free rolling local logging through `@markhere/logging-core`. Crashpad collection remains local-only, repeated unclean startup enters Safe Mode without deleting recovery, and diagnostic bundles are generated only by explicit user action and exclude document/recovery bodies. Production dependency/privacy/fuse expectations live in `docs/security/production-hardening-policy.json`.
+
+See `docs/development/issue-08-implementation.md` and `docs/development/issue-08-validation.md`.
+
 ## Pinned development baseline
 
 - Node.js `22.16.0`
@@ -126,6 +134,8 @@ pnpm check:markdown-preview
 pnpm check:editor-modes
 pnpm check:desktop-workspace
 pnpm check:unified-export
+pnpm check:security-hardening
+pnpm check:security-regression
 pnpm format:check
 pnpm lint
 pnpm typecheck

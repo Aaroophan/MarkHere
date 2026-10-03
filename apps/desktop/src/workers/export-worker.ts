@@ -37,7 +37,7 @@ parentPort.on('message', (event) => {
         type: 'error',
         requestId: request.requestId,
         code: 'EXPORT_WORKER_FAILED',
-        message: error instanceof Error ? error.message : 'Export worker failed.'
+        message: 'Export worker failed.'
       })
     }
   })()

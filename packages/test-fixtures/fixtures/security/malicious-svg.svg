@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)">
+  <script>alert(1)</script>
+  <foreignObject><iframe src="https://example.invalid"/></foreignObject>
+  <a href="javascript:alert(1)"><text>bad</text></a>
+  <rect style="fill:url(https://example.invalid/exfil)" width="10" height="10"/>
+</svg>

@@ -64,7 +64,8 @@ export const markhereBridge: MarkHereDesktopApi = Object.freeze({
   resources: Object.freeze({
     resolveLink: (request) => transport.invoke(CHANNELS.resourceResolveLink, request),
     importLocalImage: (request) => transport.invoke(CHANNELS.resourceImportLocalImage, request),
-    invalidateDocumentCache: (documentId) => transport.send(CHANNELS.resourceInvalidateDocumentCache, documentId)
+    invalidateDocumentCache: (documentId) => transport.send(CHANNELS.resourceInvalidateDocumentCache, documentId),
+    approveRemoteImages: (request) => transport.invoke(CHANNELS.resourceApproveRemoteImages, request)
   }),
   settings: Object.freeze({
     get: () => transport.invoke(CHANNELS.settingsGet),
@@ -101,6 +102,13 @@ export const markhereBridge: MarkHereDesktopApi = Object.freeze({
     download: () => transport.invoke(CHANNELS.updateDownload),
     installAndRestart: () => transport.invoke(CHANNELS.updateInstallAndRestart),
     getStatus: () => transport.invoke(CHANNELS.updateGetStatus)
+  }),
+  diagnostics: Object.freeze({
+    getSafeModeStatus: () => transport.invoke(CHANNELS.diagnosticsGetSafeModeStatus),
+    createBundle: () => transport.invoke(CHANNELS.diagnosticsCreateBundle),
+    openLogsFolder: () => transport.invoke(CHANNELS.diagnosticsOpenLogsFolder),
+    clearLogs: () => transport.invoke(CHANNELS.diagnosticsClearLogs),
+    reportRendererFault: (report) => transport.invoke(CHANNELS.diagnosticsReportRendererFault, report)
   }),
   events: Object.freeze({
     onDocumentExternalChange: (callback) => transport.on(CHANNELS.eventDocumentExternalChange, callback),

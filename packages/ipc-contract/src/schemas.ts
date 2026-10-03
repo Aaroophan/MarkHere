@@ -243,6 +243,7 @@ export const INVOKE_ARG_SCHEMAS: Record<InvokeChannel, z.ZodType> = {
     maxResults: z.number().int().min(1).max(5000).optional()
   }).strict()]),
   [CHANNELS.resourceResolveLink]: z.tuple([z.object({ documentId: id, href: z.string().min(1).max(8192) }).strict()]),
+  [CHANNELS.resourceApproveRemoteImages]: z.tuple([z.object({ documentId: id, urls: z.array(z.string().min(1).max(8192)).max(128) }).strict()]),
   [CHANNELS.resourceImportLocalImage]: z.tuple([z.object({ documentId: id, selectionToken: token, preferredName: optionalShort }).strict()]),
   [CHANNELS.settingsGet]: voidArgs,
   [CHANNELS.settingsUpdate]: z.tuple([SettingsPatchSchema]),
@@ -276,7 +277,12 @@ export const INVOKE_ARG_SCHEMAS: Record<InvokeChannel, z.ZodType> = {
   [CHANNELS.updateCheck]: voidArgs,
   [CHANNELS.updateDownload]: voidArgs,
   [CHANNELS.updateInstallAndRestart]: voidArgs,
-  [CHANNELS.updateGetStatus]: voidArgs
+  [CHANNELS.updateGetStatus]: voidArgs,
+  [CHANNELS.diagnosticsGetSafeModeStatus]: voidArgs,
+  [CHANNELS.diagnosticsCreateBundle]: voidArgs,
+  [CHANNELS.diagnosticsOpenLogsFolder]: voidArgs,
+  [CHANNELS.diagnosticsClearLogs]: voidArgs,
+  [CHANNELS.diagnosticsReportRendererFault]: z.tuple([z.object({ kind: z.enum(['vue', 'window-error', 'unhandled-rejection']), component: z.string().max(160).optional() }).strict()])
 }
 
 export const SEND_ARG_SCHEMAS: Record<SendChannel, z.ZodType> = {

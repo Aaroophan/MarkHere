@@ -16,6 +16,7 @@ import type {
   SaveDocumentResult
 } from '@markhere/ipc-contract'
 import type { OpenedVia } from '@markhere/document-model'
+import { SECURITY_BUDGETS } from '@markhere/security-core'
 import { failure, ok } from '../services/api-results'
 import type { SelectionTokenStore } from '../services/selection-token-store'
 import { FileCapabilityRegistry } from './file-capability-registry'
@@ -108,6 +109,7 @@ export class FileService {
     const identity = await identifyExistingPath(path)
     const info = await stat(identity.canonicalPath)
     if (!info.isFile()) return failure('FS_NOT_FILE', 'filesystem', 'error.fsNotFile', true)
+    if (info.size > SECURITY_BUDGETS.maxMarkdownBytes) return failure('DOC_TOO_LARGE', 'validation', 'error.documentTooLarge', true, { maxBytes: SECURITY_BUDGETS.maxMarkdownBytes, actualBytes: info.size })
     const bytes = await readFile(identity.canonicalPath)
     const decoded = decodeDocumentBytes(bytes)
     const fingerprint = await fingerprintFile(identity.canonicalPath, true)

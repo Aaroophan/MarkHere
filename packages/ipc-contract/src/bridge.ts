@@ -1,6 +1,7 @@
 import type { AppInfo, PlatformInfo } from './dto/app'
 import type { ClipboardImageDTO, RichClipboardRequest } from './dto/clipboard'
 import type { ApiResult, SelectedPath, SettingsSection, Unsubscribe } from './dto/common'
+import type { DiagnosticBundleDTO, RendererFaultReport, SafeModeStatusDTO } from './dto/diagnostics'
 import type {
   ConfirmDialogRequest,
   ConfirmDialogResult,
@@ -33,6 +34,7 @@ import type {
 } from './dto/files'
 import type { ExportFormat, ExportJobDTO, PrintRequest, StartExportRequest } from './dto/export'
 import type {
+  ApproveRemoteImagesRequest,
   ImportLocalImageRequest,
   ResolveDocumentLinkRequest,
   ResolvedDocumentLink
@@ -123,6 +125,7 @@ export interface ResourceApi {
   resolveLink(request: ResolveDocumentLinkRequest): Promise<ApiResult<ResolvedDocumentLink>>
   importLocalImage(request: ImportLocalImageRequest): Promise<ApiResult<ImportedImageResult>>
   invalidateDocumentCache(documentId: string): void
+  approveRemoteImages(request: ApproveRemoteImagesRequest): Promise<ApiResult<{ approved: number }>>
 }
 
 export interface SettingsApi {
@@ -157,6 +160,15 @@ export interface ClipboardApi {
   readImageForImport(): Promise<ApiResult<ClipboardImageDTO | null>>
   writeText(text: string): Promise<ApiResult<void>>
   writeRich(request: RichClipboardRequest): Promise<ApiResult<void>>
+}
+
+
+export interface DiagnosticsApi {
+  getSafeModeStatus(): Promise<ApiResult<SafeModeStatusDTO>>
+  createBundle(): Promise<ApiResult<DiagnosticBundleDTO>>
+  openLogsFolder(): Promise<ApiResult<void>>
+  clearLogs(): Promise<ApiResult<void>>
+  reportRendererFault(report: RendererFaultReport): Promise<ApiResult<void>>
 }
 
 export interface UpdateApi {
@@ -194,6 +206,7 @@ export interface MarkHereDesktopApi {
   readonly shell: ShellApi
   readonly clipboard: ClipboardApi
   readonly updates: UpdateApi
+  readonly diagnostics: DiagnosticsApi
   readonly events: EventApi
 }
 
