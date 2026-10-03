@@ -111,6 +111,7 @@ export const markhereBridge: MarkHereDesktopApi = Object.freeze({
     reportRendererFault: (report) => transport.invoke(CHANNELS.diagnosticsReportRendererFault, report)
   }),
   events: Object.freeze({
+    onStartupActivation: (callback) => transport.on(CHANNELS.eventStartupActivation, callback),
     onDocumentExternalChange: (callback) => transport.on(CHANNELS.eventDocumentExternalChange, callback),
     onWorkspaceChange: (callback) => transport.on(CHANNELS.eventWorkspaceChange, callback),
     onWorkspaceSearchBatch: (callback) => transport.on(CHANNELS.eventWorkspaceSearchBatch, callback),

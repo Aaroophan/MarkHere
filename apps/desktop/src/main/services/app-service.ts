@@ -1,4 +1,4 @@
-import { app, dialog, type WebContents } from 'electron'
+import { app, dialog, shell, type WebContents } from 'electron'
 import type { ApiResult, AppInfo, PlatformInfo, SettingsSection } from '@markhere/ipc-contract'
 import { MARKHERE_BRIDGE_VERSION, MARKHERE_PRODUCT_NAME } from '@markhere/shared'
 import { ok } from './api-results'
@@ -54,6 +54,13 @@ export class AppService {
     }
     if (owner) await dialog.showMessageBox(owner, options)
     else await dialog.showMessageBox(options)
+    return ok(undefined)
+  }
+
+  async openDefaultAppsSettings(): Promise<ApiResult<void>> {
+    if (process.platform !== 'win32') return ok(undefined)
+    const uri = `ms-settings:defaultapps?registeredAppUser=${encodeURIComponent('MarkHere')}`
+    await shell.openExternal(uri)
     return ok(undefined)
   }
 

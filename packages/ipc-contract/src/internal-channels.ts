@@ -57,6 +57,7 @@ import type {
   KeybindingsChangedEvent,
   SettingsChangedEvent,
   WindowStateEvent,
+  StartupActivationEvent,
   WorkspaceChangeEvent
 } from './dto/events'
 
@@ -66,6 +67,7 @@ export const CHANNELS = Object.freeze({
   appRequestQuit: 'mh:v1:app:request-quit',
   appOpenAbout: 'mh:v1:app:open-about',
   appOpenSettings: 'mh:v1:app:open-settings',
+  appOpenDefaultAppsSettings: 'mh:v1:app:open-default-apps-settings',
   windowMinimize: 'mh:v1:window:minimize',
   windowToggleMaximize: 'mh:v1:window:toggle-maximize',
   windowClose: 'mh:v1:window:close',
@@ -138,6 +140,7 @@ export const CHANNELS = Object.freeze({
   diagnosticsOpenLogsFolder: 'mh:v1:diagnostics:open-logs-folder',
   diagnosticsClearLogs: 'mh:v1:diagnostics:clear-logs',
   diagnosticsReportRendererFault: 'mh:v1:diagnostics:report-renderer-fault',
+  eventStartupActivation: 'mh:v1:event:startup-activation',
   eventDocumentExternalChange: 'mh:v1:event:document-external-change',
   eventWorkspaceChange: 'mh:v1:event:workspace-change',
   eventWorkspaceSearchBatch: 'mh:v1:event:workspace-search-batch',
@@ -157,6 +160,7 @@ export interface InvokeChannelMap {
   [CHANNELS.appRequestQuit]: { args: []; result: ApiResult<void> }
   [CHANNELS.appOpenAbout]: { args: []; result: ApiResult<void> }
   [CHANNELS.appOpenSettings]: { args: [section?: SettingsSection]; result: ApiResult<void> }
+  [CHANNELS.appOpenDefaultAppsSettings]: { args: []; result: ApiResult<void> }
   [CHANNELS.windowIsMaximized]: { args: []; result: ApiResult<boolean> }
   [CHANNELS.windowIsFullScreen]: { args: []; result: ApiResult<boolean> }
   [CHANNELS.windowSetAlwaysOnTop]: { args: [enabled: boolean]; result: ApiResult<void> }
@@ -235,6 +239,7 @@ export interface SendChannelMap {
 }
 
 export interface MainEventChannelMap {
+  [CHANNELS.eventStartupActivation]: StartupActivationEvent
   [CHANNELS.eventDocumentExternalChange]: DocumentExternalChangeEvent
   [CHANNELS.eventWorkspaceChange]: WorkspaceChangeEvent
   [CHANNELS.eventWorkspaceSearchBatch]: WorkspaceSearchBatchEvent

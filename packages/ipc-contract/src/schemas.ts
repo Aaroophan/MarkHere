@@ -197,6 +197,7 @@ export const INVOKE_ARG_SCHEMAS: Record<InvokeChannel, z.ZodType> = {
   [CHANNELS.appRequestQuit]: voidArgs,
   [CHANNELS.appOpenAbout]: voidArgs,
   [CHANNELS.appOpenSettings]: z.tuple([settingsSection.optional()]),
+  [CHANNELS.appOpenDefaultAppsSettings]: voidArgs,
   [CHANNELS.windowIsMaximized]: voidArgs,
   [CHANNELS.windowIsFullScreen]: voidArgs,
   [CHANNELS.windowSetAlwaysOnTop]: z.tuple([z.boolean()]),
@@ -340,7 +341,17 @@ export const KeybindingsChangedEventSchema = z.object({
   }).strict()
 }).strict()
 
+const StartupActivationEventSchema = z.object({
+  documents: z.array(z.object({
+    documentId: id, displayPath: boundedString(4096), basename: boundedString(512), markdown: boundedString(16 * 1024 * 1024),
+    revision: z.number().int().positive(), persistedRevision: z.number().int().positive(), fingerprint: z.unknown(), textFormat: z.unknown(), writable: z.boolean(), resourceScopeId: id
+  }).passthrough()).max(32),
+  workspace: z.object({ workspaceId: id, displayPath: boundedString(4096), basename: boundedString(512) }).strict().optional(),
+  mode: z.enum(['preview','wysiwyg','source','split']).optional()
+}).strict()
+
 export const MAIN_EVENT_SCHEMAS = Object.freeze({
+  [CHANNELS.eventStartupActivation]: StartupActivationEventSchema,
   [CHANNELS.eventDocumentExternalChange]: DocumentExternalChangeEventSchema,
   [CHANNELS.eventWorkspaceChange]: WorkspaceChangeEventSchema,
   [CHANNELS.eventWorkspaceSearchBatch]: WorkspaceSearchBatchEventSchema,

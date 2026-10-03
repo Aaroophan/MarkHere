@@ -10,7 +10,6 @@ import {
   type WorkspaceEntry,
   type ResolvedDocumentLink,
   type RecoveryUpdateResult,
-  type UpdateStatus
 } from '@markhere/ipc-contract'
 import type { TrustedWebContentsRegistry } from '../security/trusted-web-contents-registry'
 import type { CapabilityOwnershipRegistry, CapabilityKind } from '../security/capability-ownership-registry'
@@ -20,6 +19,7 @@ import type { DialogService } from '../services/dialog-service'
 import type { ShellService } from '../services/shell-service'
 import type { ClipboardService } from '../services/clipboard-service'
 import type { FutureService } from '../services/future-service'
+import type { UpdateService } from '../services/update-service'
 import type { FileService } from '../documents/file-service'
 import type { RecoveryService } from '../storage/recovery-service'
 import type { ResourceService } from '../resources/resource-service'
@@ -49,6 +49,7 @@ export interface IpcServices {
   readonly workspace: WorkspaceService
   readonly exports: ExportCoordinator
   readonly diagnostics: DiagnosticService
+  readonly updates: UpdateService
   readonly future: FutureService
 }
 
@@ -80,6 +81,7 @@ export function registerIpcHandlers(services: IpcServices): void {
   registerValidatedInvoke(trusted, CHANNELS.appRequestQuit, () => services.app.requestQuit())
   registerValidatedInvoke(trusted, CHANNELS.appOpenAbout, (event) => services.app.openAbout(event.sender))
   registerValidatedInvoke(trusted, CHANNELS.appOpenSettings, (_event, _sender, section) => services.app.openSettings(section))
+  registerValidatedInvoke(trusted, CHANNELS.appOpenDefaultAppsSettings, () => services.app.openDefaultAppsSettings())
 
   registerValidatedSend(trusted, CHANNELS.windowMinimize, (event) => services.window.minimize(event.sender))
   registerValidatedSend(trusted, CHANNELS.windowToggleMaximize, (event) => services.window.toggleMaximize(event.sender))
@@ -204,10 +206,10 @@ export function registerIpcHandlers(services: IpcServices): void {
   registerValidatedInvoke(trusted, CHANNELS.clipboardWriteText, (_event, _sender, text) => services.clipboard.writeText(text))
   registerValidatedInvoke(trusted, CHANNELS.clipboardWriteRich, (_event, _sender, request) => services.clipboard.writeRich(request))
 
-  registerValidatedInvoke(trusted, CHANNELS.updateCheck, () => services.future.unavailable<UpdateStatus>('updates.check'))
-  registerValidatedInvoke(trusted, CHANNELS.updateDownload, () => services.future.unavailable<void>('updates.download'))
-  registerValidatedInvoke(trusted, CHANNELS.updateInstallAndRestart, () => services.future.unavailable<void>('updates.installAndRestart'))
-  registerValidatedInvoke(trusted, CHANNELS.updateGetStatus, () => services.future.unavailable<UpdateStatus>('updates.getStatus'))
+  registerValidatedInvoke(trusted, CHANNELS.updateCheck, () => services.updates.check())
+  registerValidatedInvoke(trusted, CHANNELS.updateDownload, () => services.updates.download())
+  registerValidatedInvoke(trusted, CHANNELS.updateInstallAndRestart, () => services.updates.installAndRestart())
+  registerValidatedInvoke(trusted, CHANNELS.updateGetStatus, () => services.updates.getStatus())
 
   registerValidatedInvoke(trusted, CHANNELS.diagnosticsGetSafeModeStatus, () => services.diagnostics.getSafeModeStatus())
   registerValidatedInvoke(trusted, CHANNELS.diagnosticsCreateBundle, () => services.diagnostics.createBundle())

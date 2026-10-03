@@ -78,6 +78,10 @@ export class WorkspaceService {
     } catch (error) { return workspaceError(error, 'open') }
   }
 
+  async openPathFromActivation(path: string, ownerWebContentsId: number): Promise<ApiResult<WorkspaceDTO>> {
+    try { return await this.#openPath(path, ownerWebContentsId) } catch (error) { return workspaceError(error, 'activation-open') }
+  }
+
   async reopenRecent(recentId: string, ownerWebContentsId: number): Promise<ApiResult<WorkspaceDTO>> {
     const path = await this.#recents.resolveWorkspace(recentId)
     if (!path) return failure('RECENT_WORKSPACE_NOT_FOUND', 'workspace', 'error.recentWorkspaceNotFound', true)

@@ -390,6 +390,11 @@ onMounted(async () => {
   await loadFoundationState()
   if (isSettingsSurface) return
   registerCommands()
+  unsubscribers.push(window.markhere.events.onStartupActivation((event) => {
+    if (event.workspace) { workspaceStore.setWorkspace(event.workspace); windowSession.workspaceId = event.workspace.workspaceId; sidebarPanel.value = 'files' }
+    for (const document of event.documents) activateOpenedDocument(document, undefined, event.mode)
+    if (event.mode && activeDocument.value) void nextTick().then(() => editor.value?.transition(event.mode!))
+  }))
   unsubscribers.push(window.markhere.events.onAppCommand((event: AppCommandEvent) => void commandRegistry.execute(event)))
   unsubscribers.push(window.markhere.events.onWindowState((event) => { windowState.value = event }))
   unsubscribers.push(window.markhere.events.onSettingsChanged((event) => { settings.value = event.settings; applyTheme() }))

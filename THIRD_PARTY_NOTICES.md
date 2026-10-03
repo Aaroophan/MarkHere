@@ -35,3 +35,7 @@ Package-level third-party notices and the CycloneDX SBOM are generated from the 
 ## jsdom (test-only)
 
 Security sanitizer regression tests use exact development dependency **jsdom 30.1.1** (MIT) to exercise DOMPurify against hostile HTML/SVG in a browser-like DOM during automated tests. It is not a MarkHere production runtime dependency and should not be packaged into release application code.
+
+## electron-builder / electron-updater / @electron/fuses
+
+Issue 9 uses exact reviewed packaging dependencies **electron-builder 26.15.3**, **electron-updater 6.8.9**, and **@electron/fuses 2.1.3**. They are used for Windows NSIS/ZIP packaging, main-process update integration, and package-time Electron fuse hardening respectively. Their transitive license inventory remains governed by the lockfile-derived compliance generator before release.

@@ -26,7 +26,7 @@
     "licenses": "node scripts/compliance.mjs licenses",
     "sbom": "node scripts/compliance.mjs sbom",
     "compliance": "node scripts/compliance.mjs all",
-    "ci:foundation": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm check:foundation && pnpm check:secure-shell && pnpm check:document-lifecycle && pnpm check:markdown-preview && pnpm check:editor-modes && pnpm check:desktop-workspace && pnpm check:unified-export && pnpm check:security-hardening && pnpm check:security-regression && pnpm compliance && pnpm build",
+    "ci:foundation": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm check:foundation && pnpm check:secure-shell && pnpm check:document-lifecycle && pnpm check:markdown-preview && pnpm check:editor-modes && pnpm check:desktop-workspace && pnpm check:unified-export && pnpm check:security-hardening && pnpm check:security-regression && pnpm check:deployment && pnpm compliance && pnpm build",
     "graph:dependencies": "node scripts/generate-dependency-graph.mjs",
     "check:manifests": "node scripts/check-manifests.mjs",
     "check:secure-shell": "node scripts/verify-secure-shell.mjs",
@@ -38,7 +38,14 @@
     "check:unified-export": "node scripts/verify-unified-export.mjs",
     "check:security-hardening": "node scripts/check-security-hardening.mjs",
     "check:security-regression": "node scripts/verify-security-operations.mjs",
-    "audit:dependencies": "pnpm audit --prod --audit-level high"
+    "audit:dependencies": "pnpm audit --prod --audit-level high",
+    "package:win:x64": "pnpm --filter @markhere/desktop package:win:x64",
+    "package:win:dir": "pnpm --filter @markhere/desktop package:win:dir",
+    "check:deployment": "node scripts/verify-windows-deployment.mjs",
+    "release:manifest": "node scripts/release/generate-release-manifest.mjs",
+    "release:checksums": "node scripts/release/generate-checksums.mjs",
+    "release:verify-signatures": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release/verify-authenticode.ps1",
+    "release:verify-fuses": "node scripts/release/verify-fuses.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",
@@ -48,6 +55,8 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.61.1",
     "vue-eslint-parser": "10.4.1",
-    "vitest": "4.1.9"
+    "vitest": "4.1.9",
+    "electron-builder": "26.15.3",
+    "@electron/fuses": "2.1.3"
   }
 }

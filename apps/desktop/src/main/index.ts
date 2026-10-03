@@ -47,6 +47,7 @@ import { DiagnosticService } from './diagnostics/diagnostic-service'
 import { IpcAbuseProtector } from './security/ipc-abuse-protector'
 import { RemoteResourceApprovalRegistry } from './security/remote-resource-approval-registry'
 import { configureValidatedIpcSecurity } from './ipc/validated-ipc'
+import { UpdateService } from './services/update-service'
 
 registerPrivilegedSchemes()
 app.enableSandbox()
@@ -191,6 +192,33 @@ async function boot(): Promise<void> {
   })
   workspace = new WorkspaceService({ selections, capabilities: workspaceCapabilities, files, recents, watch: workspaceWatch, search: workspaceSearch })
 
+  lifecycle.setStartupReadyHandler((request) => {
+    void (async () => {
+      const targetWindow = request.newWindow ? windows.createEditorWindow() : windows.focusOrCreateEditor()
+      if (targetWindow.webContents.isLoadingMainFrame()) await new Promise<void>((resolve) => targetWindow.webContents.once('did-finish-load', () => resolve()))
+      const documents = []
+      let openedWorkspace
+      for (const item of request.paths) {
+        if (item.kind === 'file') {
+          const result = await files.reopenPath(item.path, targetWindow.webContents.id)
+          if (result.ok) documents.push(result.data)
+          else logger.warn('activation.file.failed', { errorCode: result.error.code })
+        } else if (item.kind === 'directory' && !openedWorkspace) {
+          const result = await workspace!.openPathFromActivation(item.path, targetWindow.webContents.id)
+          if (result.ok) openedWorkspace = result.data
+          else logger.warn('activation.workspace.failed', { errorCode: result.error.code })
+        } else if (item.kind === 'missing') logger.warn('activation.path.missing')
+      }
+      if (documents.length || openedWorkspace || request.mode) {
+        events.send(targetWindow.webContents, CHANNELS.eventStartupActivation, {
+          documents,
+          ...(openedWorkspace ? { workspace: openedWorkspace } : {}),
+          ...(request.mode ? { mode: request.mode } : {})
+        })
+      }
+    })()
+  })
+
   const exportTemp = new ExportTempStorage(app.getPath('temp'))
   const exportWorker = new ExportWorkerClient()
   const pdfPrintSurface = new PdfPrintSurface(windows, printDocuments)
@@ -221,6 +249,9 @@ async function boot(): Promise<void> {
 
   const appService = new AppService(windows, () => lifecycle.requestQuit())
   const diagnostics = new DiagnosticService(logger, crashHealth)
+  const updates = new UpdateService(logger, (status) => {
+    for (const window of windows.list()) if (!window.isDestroyed()) events.send(window.webContents, CHANNELS.eventUpdateStatus, status)
+  })
   registerIpcHandlers({
     trusted,
     capabilities,
@@ -238,6 +269,7 @@ async function boot(): Promise<void> {
     workspace,
     exports: exportCoordinator,
     diagnostics,
+    updates,
     future: new FutureService()
   })
 

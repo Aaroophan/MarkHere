@@ -9,7 +9,7 @@ export interface AppLifecycleOptions {
 export class AppLifecycle {
   readonly #preReadyQueue: StartupRequest[] = []
   readonly #readyQueue: StartupRequest[] = []
-  readonly #onStartupReady: ((request: StartupRequest) => void) | undefined
+  #onStartupReady: ((request: StartupRequest) => void) | undefined
   #windows: WindowManager | null = null
   #rendererReady = false
   #approvedQuit = false
@@ -66,6 +66,10 @@ export class AppLifecycle {
 
   attachWindowManager(windowManager: WindowManager): void {
     this.#windows = windowManager
+  }
+
+  setStartupReadyHandler(handler: (request: StartupRequest) => void): void {
+    this.#onStartupReady = handler
   }
 
   async enqueueInitial(argv: readonly string[], cwd: string): Promise<void> {

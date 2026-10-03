@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { KeybindingConfig, MarkHereSettings, SettingsPatch, SettingsSection } from '@markhere/ipc-contract'
+import type { KeybindingConfig, MarkHereSettings, SettingsPatch, SettingsSection, UpdateStatus } from '@markhere/ipc-contract'
 import { RENDERER_COMMANDS } from '../command-catalog'
 import { presentShortcut } from '../keyboard-shortcuts'
 
@@ -10,9 +10,10 @@ const settings = ref<MarkHereSettings>(props.initialSettings)
 const keybindings = ref<KeybindingConfig>(props.initialKeybindings)
 const error = ref<string | null>(null)
 const saving = ref(false)
+const updateStatus = ref<UpdateStatus>({ state: 'idle' })
 const unsubscribers: Array<() => void> = []
 const bindingDraft = ref<Record<string, string>>({ ...props.initialKeybindings.bindings })
-const sections: readonly SettingsSection[] = ['general', 'appearance', 'editor', 'files', 'keybindings']
+const sections: readonly SettingsSection[] = ['general', 'appearance', 'editor', 'files', 'keybindings', 'updates']
 const activeSection = ref<SettingsSection>('general')
 const commands = computed(() => RENDERER_COMMANDS.filter((command) => command.id !== 'app.quit'))
 
@@ -71,9 +72,16 @@ async function createDiagnostics(): Promise<void> {
 async function openLogs(): Promise<void> { const result = await window.markhere.diagnostics.openLogsFolder(); if (!result.ok) error.value = result.error.code }
 async function clearLogs(): Promise<void> { const result = await window.markhere.diagnostics.clearLogs(); if (!result.ok) error.value = result.error.code }
 
+async function checkForUpdates(): Promise<void> { const result = await window.markhere.updates.check(); if (result.ok) updateStatus.value = result.data; else error.value = result.error.code }
+async function downloadUpdate(): Promise<void> { const result = await window.markhere.updates.download(); if (!result.ok) error.value = result.error.code }
+async function installUpdate(): Promise<void> { const result = await window.markhere.updates.installAndRestart(); if (!result.ok) error.value = result.error.code }
+async function openDefaultApps(): Promise<void> { const result = await window.markhere.app.openDefaultAppsSettings(); if (!result.ok) error.value = result.error.code }
+
 onMounted(() => {
   unsubscribers.push(window.markhere.events.onSettingsChanged((event) => { settings.value = event.settings }))
   unsubscribers.push(window.markhere.events.onKeybindingsChanged((event) => { keybindings.value = event.config; bindingDraft.value = { ...event.config.bindings } }))
+  unsubscribers.push(window.markhere.events.onUpdateStatus((event) => { updateStatus.value = event }))
+  void window.markhere.updates.getStatus().then((result) => { if (result.ok) updateStatus.value = result.data })
 })
 onBeforeUnmount(() => { for (const unsubscribe of unsubscribers) unsubscribe() })
 </script>
@@ -93,6 +101,7 @@ onBeforeUnmount(() => { for (const unsubscribe of unsubscribers) unsubscribe() }
             <select :value="settings.defaultMode" @change="updateSelect($event, 'defaultMode')"><option value="preview">Preview</option><option value="wysiwyg">WYSIWYG</option><option value="source">Source</option><option value="split">Split</option></select>
           </label>
           <button type="button" @click="reset('general')">Reset general settings</button>
+          <div class="diagnostics-actions"><strong>Windows integration</strong><p>MarkHere registers as a Markdown handler candidate but never overwrites your Windows default automatically.</p><button type="button" @click="openDefaultApps">Make MarkHere my default Markdown app…</button></div>
           <div class="diagnostics-actions"><strong>Local diagnostics</strong><p>Diagnostic bundles are created only on request and exclude document/recovery bodies.</p><div class="row"><button type="button" @click="createDiagnostics">Create diagnostic bundle</button><button type="button" @click="openLogs">Open logs folder</button><button type="button" @click="clearLogs">Clear logs</button></div></div>
         </fieldset>
         <fieldset v-else-if="activeSection === 'appearance'">
@@ -128,6 +137,12 @@ onBeforeUnmount(() => { for (const unsubscribe of unsubscribers) unsubscribe() }
             <label v-for="command in commands" :key="command.id"><span>{{ command.label }}</span><input v-model="bindingDraft[command.id]" :placeholder="presentShortcut(keybindings.bindings[command.id] ?? '', platform)"></label>
           </div>
           <div class="row"><button type="button" @click="saveKeybindings">Save shortcuts</button><button type="button" @click="resetKeybindings">Reset shortcuts</button></div>
+        </fieldset>
+        <fieldset v-else-if="activeSection === 'updates'">
+          <legend>Updates</legend>
+          <p>Update channel is fixed by the installed build and cannot be redirected by document content.</p>
+          <p aria-live="polite"><strong>Status:</strong> {{ updateStatus.state }}<span v-if="updateStatus.version"> · {{ updateStatus.version }}</span><span v-if="updateStatus.percent !== undefined"> · {{ Math.round(updateStatus.percent) }}%</span></p>
+          <div class="row"><button type="button" :disabled="updateStatus.state === 'checking' || updateStatus.state === 'downloading'" @click="checkForUpdates">Check for updates</button><button type="button" :disabled="updateStatus.state !== 'available'" @click="downloadUpdate">Download</button><button type="button" :disabled="updateStatus.state !== 'downloaded'" @click="installUpdate">Install and restart</button></div>
         </fieldset>
         <p v-if="saving" aria-live="polite">Saving…</p>
       </section>

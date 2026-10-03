@@ -11,7 +11,9 @@
     "start": "electron-vite preview",
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.preload.json --noEmit && vue-tsc -p tsconfig.renderer.json --noEmit && tsc -p tsconfig.worker.json --noEmit",
     "test": "vitest run --passWithNoTests",
-    "security:probe": "node scripts/run-security-probe.mjs"
+    "security:probe": "node scripts/run-security-probe.mjs",
+    "package:win:x64": "pnpm build && electron-builder --config ../../electron-builder.config.mjs --win nsis zip --x64",
+    "package:win:dir": "pnpm build && electron-builder --config ../../electron-builder.config.mjs --win dir --x64"
   },
   "dependencies": {
     "@markhere/document-model": "workspace:*",
@@ -33,7 +35,8 @@
     "@markhere/export-html": "workspace:*",
     "@markhere/export-pdf": "workspace:*",
     "@markhere/export-docx": "workspace:*",
-    "@markhere/logging-core": "workspace:*"
+    "@markhere/logging-core": "workspace:*",
+    "electron-updater": "6.8.9"
   },
   "devDependencies": {
     "@types/node": "22.20.2",

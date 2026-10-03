@@ -1,0 +1,96 @@
+name: Windows Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        type: choice
+        options: [alpha, beta, stable]
+        default: alpha
+
+permissions:
+  contents: write
+
+jobs:
+  windows-x64:
+    runs-on: windows-2025
+    environment: ${{ (github.event_name == 'workflow_dispatch' && inputs.channel) || 'stable' }}
+    env:
+      MARKHERE_RELEASE_CHANNEL: ${{ (github.event_name == 'workflow_dispatch' && inputs.channel) || 'stable' }}
+      MARKHERE_WINDOWS_PUBLISHER: ${{ secrets.MARKHERE_WINDOWS_PUBLISHER }}
+      MARKHERE_UPDATE_BASE_URL: ${{ secrets.MARKHERE_UPDATE_BASE_URL }}
+      CSC_LINK: ${{ secrets.MARKHERE_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.MARKHERE_CSC_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.16.0
+          cache: pnpm
+      - name: Require release inputs
+        shell: pwsh
+        run: |
+          if (-not (Test-Path pnpm-lock.yaml)) { throw 'pnpm-lock.yaml is mandatory for release builds.' }
+          if ($env:MARKHERE_RELEASE_CHANNEL -eq 'stable') {
+            if (-not $env:MARKHERE_WINDOWS_PUBLISHER) { throw 'Missing MARKHERE_WINDOWS_PUBLISHER.' }
+            if (-not $env:MARKHERE_UPDATE_BASE_URL) { throw 'Missing MARKHERE_UPDATE_BASE_URL.' }
+            if (-not $env:CSC_LINK) { throw 'Missing MARKHERE_CSC_LINK.' }
+            if (-not $env:CSC_KEY_PASSWORD) { throw 'Missing MARKHERE_CSC_KEY_PASSWORD.' }
+          }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm check:foundation
+      - run: pnpm check:secure-shell
+      - run: pnpm check:document-lifecycle
+      - run: pnpm check:markdown-preview
+      - run: pnpm check:editor-modes
+      - run: pnpm check:desktop-workspace
+      - run: pnpm check:unified-export
+      - run: pnpm check:security-hardening
+      - run: pnpm check:security-regression
+      - run: pnpm check:deployment
+      - run: pnpm audit:dependencies
+      - run: pnpm compliance
+      - run: pnpm package:win:x64
+      - name: Verify production fuses
+        run: pnpm release:verify-fuses -- dist/win-unpacked/markhere.exe
+      - name: Verify Authenticode signatures
+        if: env.MARKHERE_RELEASE_CHANNEL == 'stable'
+        run: pnpm release:verify-signatures -- dist
+      - run: pnpm release:manifest -- dist
+      - run: pnpm release:checksums -- dist
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: MarkHere-windows-x64-${{ github.ref_name }}
+          path: |
+            dist/*.exe
+            dist/*.zip
+            dist/*.yml
+            dist/*.blockmap
+            dist/checksums.txt
+            dist/release-manifest.json
+            THIRD_PARTY_NOTICES.md
+            sbom.json
+          if-no-files-found: error
+      - name: Publish tagged release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          gh release view "${{ github.ref_name }}" *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create "${{ github.ref_name }}" --title "MarkHere ${{ github.ref_name }}" --generate-notes }
+          Get-ChildItem dist -File | Where-Object { $_.Extension -in '.exe','.zip','.yml','.blockmap','.txt','.json' } | ForEach-Object { gh release upload "${{ github.ref_name }}" $_.FullName --clobber }
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -15,6 +15,7 @@ import type {
   ExportProgressEvent,
   KeybindingsChangedEvent,
   SettingsChangedEvent,
+  StartupActivationEvent,
   UpdateStatus,
   WindowStateEvent,
   WorkspaceChangeEvent,
@@ -67,6 +68,7 @@ export interface AppApi {
   requestQuit(): Promise<ApiResult<void>>
   openAbout(): Promise<ApiResult<void>>
   openSettings(section?: SettingsSection): Promise<ApiResult<void>>
+  openDefaultAppsSettings(): Promise<ApiResult<void>>
 }
 
 export interface WindowApi {
@@ -179,6 +181,7 @@ export interface UpdateApi {
 }
 
 export interface EventApi {
+  onStartupActivation(cb: (event: StartupActivationEvent) => void): Unsubscribe
   onDocumentExternalChange(cb: (event: DocumentExternalChangeEvent) => void): Unsubscribe
   onWorkspaceChange(cb: (event: WorkspaceChangeEvent) => void): Unsubscribe
   onWorkspaceSearchBatch(cb: (event: WorkspaceSearchBatchEvent) => void): Unsubscribe

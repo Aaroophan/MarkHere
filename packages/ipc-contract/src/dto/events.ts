@@ -3,7 +3,8 @@ import type { UpdateStatus } from './update'
 import type { AppCommandEvent, WindowStateEvent } from './common'
 import type { FileFingerprint } from './files'
 import type { KeybindingConfig, MarkHereSettings } from './settings'
-import type { WorkspaceSearchBatchEvent, WorkspaceSearchCompletedEvent } from './workspace'
+import type { WorkspaceDTO, WorkspaceSearchBatchEvent, WorkspaceSearchCompletedEvent } from './workspace'
+import type { OpenDocumentDTO } from './files'
 
 export interface DocumentExternalChangeEvent {
   readonly documentId: string
@@ -16,6 +17,13 @@ export interface WorkspaceChangeEvent {
   readonly workspaceId: string
   readonly kind: 'added' | 'changed' | 'removed'
   readonly relativePath: string
+}
+
+
+export interface StartupActivationEvent {
+  readonly documents: readonly OpenDocumentDTO[]
+  readonly workspace?: WorkspaceDTO
+  readonly mode?: 'preview' | 'wysiwyg' | 'source' | 'split'
 }
 
 export interface SettingsChangedEvent {
