@@ -31,7 +31,7 @@ import type {
   SaveDocumentRequest,
   SaveDocumentResult
 } from './dto/files'
-import type { ExportFormat, ExportJobDTO, StartExportRequest } from './dto/export'
+import type { ExportFormat, ExportJobDTO, PrintRequest, StartExportRequest } from './dto/export'
 import type {
   ImportLocalImageRequest,
   ResolveDocumentLinkRequest,
@@ -143,6 +143,7 @@ export interface RecoveryApi {
 
 export interface ExportApi {
   start(request: StartExportRequest): Promise<ApiResult<{ jobId: string }>>
+  print(request: PrintRequest): Promise<ApiResult<{ jobId: string }>>
   cancel(jobId: string): void
   getStatus(jobId: string): Promise<ApiResult<ExportJobDTO>>
 }

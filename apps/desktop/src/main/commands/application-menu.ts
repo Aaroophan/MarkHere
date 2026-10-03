@@ -36,6 +36,7 @@ export function installApplicationMenu(commands: ApplicationCommandRegistry): ()
               commandItem('file.export.docx')
             ]
           },
+          commandItem('file.print'),
           { type: 'separator' },
           commandItem('app.quit')
         ]

@@ -65,6 +65,32 @@ export class WindowManager {
     return this.#createWindow('editor', bounds)
   }
 
+  createPrintWindow(): BrowserWindow {
+    const window = new BrowserWindow({
+      show: false,
+      width: 900,
+      height: 1200,
+      title: 'MarkHere Print',
+      webPreferences: {
+        nodeIntegration: false,
+        nodeIntegrationInWorker: false,
+        nodeIntegrationInSubFrames: false,
+        contextIsolation: true,
+        sandbox: true,
+        webSecurity: true,
+        allowRunningInsecureContent: false,
+        experimentalFeatures: false,
+        devTools: false,
+        webviewTag: false,
+        spellcheck: false
+      }
+    })
+    window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    window.webContents.on('will-navigate', (event) => event.preventDefault())
+    window.webContents.on('will-redirect', (event) => event.preventDefault())
+    return window
+  }
+
   createSettingsWindow(): BrowserWindow {
     const existing = [...this.#windows.values()].find((entry) => entry.kind === 'settings')
     if (existing && !existing.browserWindow.isDestroyed()) {

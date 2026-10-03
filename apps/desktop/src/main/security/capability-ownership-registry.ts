@@ -13,6 +13,11 @@ export class CapabilityOwnershipRegistry {
     this.#owners.set(capabilityId, { kind, ownerWebContentsId, createdAt: Date.now() })
   }
 
+  has(capabilityId: string, kind?: CapabilityKind): boolean {
+    const owner = this.#owners.get(capabilityId)
+    return !!owner && (kind === undefined || owner.kind === kind)
+  }
+
   owns(capabilityId: string, kind: CapabilityKind, ownerWebContentsId: number): boolean {
     const owner = this.#owners.get(capabilityId)
     return !!owner && owner.kind === kind && owner.ownerWebContentsId === ownerWebContentsId

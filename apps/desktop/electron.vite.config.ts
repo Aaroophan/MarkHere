@@ -6,6 +6,10 @@ import vue from '@vitejs/plugin-vue'
 const desktopRoot = fileURLToPath(new URL('.', import.meta.url))
 const internalMainPackages = [
   '@markhere/document-model',
+  '@markhere/export-core',
+  '@markhere/export-html',
+  '@markhere/export-pdf',
+  '@markhere/export-docx',
   '@markhere/ipc-contract',
   '@markhere/security-core',
   '@markhere/shared'
@@ -21,7 +25,10 @@ export default defineConfig({
       },
       outDir: 'out/main',
       rollupOptions: {
-        input: resolve(desktopRoot, 'src/main/index.ts')
+        input: {
+          index: resolve(desktopRoot, 'src/main/index.ts'),
+          'export-worker': resolve(desktopRoot, 'src/workers/export-worker.ts')
+        }
       }
     }
   },

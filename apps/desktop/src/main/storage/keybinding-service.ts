@@ -16,6 +16,7 @@ export const DEFAULT_KEYBINDINGS: Readonly<Record<CommandId, string>> = Object.f
   'file.export.html': '',
   'file.export.pdf': '',
   'file.export.docx': '',
+  'file.print': 'CmdOrCtrl+P',
   'view.mode.preview': 'CmdOrCtrl+1',
   'view.mode.wysiwyg': 'CmdOrCtrl+2',
   'view.mode.source': 'CmdOrCtrl+3',

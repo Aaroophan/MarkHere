@@ -1,4 +1,5 @@
 import { BrowserWindow, dialog, type WebContents } from 'electron'
+import { extname } from 'node:path'
 import type {
   ApiResult,
   ConfirmDialogRequest,
@@ -71,8 +72,9 @@ export class DialogService {
       filters: [{ name: request.format.toUpperCase(), extensions: [extension] }]
     })
     if (result.canceled || !result.filePath) return ok(null)
-    const token = this.#tokens.issue('export-target', result.filePath, sender.id)
-    return ok({ displayPath: result.filePath, selectionToken: token.token })
+    const chosenPath = extname(result.filePath).toLocaleLowerCase('en-US') === `.${extension}` ? result.filePath : `${result.filePath}.${extension}`
+    const token = this.#tokens.issue('export-target', chosenPath, sender.id)
+    return ok({ displayPath: chosenPath, selectionToken: token.token })
   }
 
   async confirm(sender: WebContents, request: ConfirmDialogRequest): Promise<ApiResult<ConfirmDialogResult>> {

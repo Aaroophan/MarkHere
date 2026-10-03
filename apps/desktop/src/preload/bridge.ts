@@ -83,6 +83,7 @@ export const markhereBridge: MarkHereDesktopApi = Object.freeze({
   }),
   exports: Object.freeze({
     start: (request) => transport.invoke(CHANNELS.exportStart, request),
+    print: (request) => transport.invoke(CHANNELS.exportPrint, request),
     cancel: (jobId) => transport.send(CHANNELS.exportCancel, jobId),
     getStatus: (jobId) => transport.invoke(CHANNELS.exportGetStatus, jobId)
   }),

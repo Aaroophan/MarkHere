@@ -28,7 +28,11 @@
     "@markhere/editor-core": "workspace:*",
     "@markhere/editor-session": "workspace:*",
     "@markhere/source-editor": "workspace:*",
-    "@vscode/ripgrep": "1.18.0"
+    "@vscode/ripgrep": "1.18.0",
+    "@markhere/export-core": "workspace:*",
+    "@markhere/export-html": "workspace:*",
+    "@markhere/export-pdf": "workspace:*",
+    "@markhere/export-docx": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "22.20.2",

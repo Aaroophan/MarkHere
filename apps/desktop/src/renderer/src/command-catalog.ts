@@ -11,6 +11,7 @@ export const RENDERER_COMMANDS: readonly RendererCommandDescriptor[] = Object.fr
   { id: 'file.export.html', label: 'Export HTML…', requiresDocument: true },
   { id: 'file.export.pdf', label: 'Export PDF…', requiresDocument: true },
   { id: 'file.export.docx', label: 'Export Word…', requiresDocument: true },
+  { id: 'file.print', label: 'Print…', requiresDocument: true },
   { id: 'view.mode.preview', label: 'Mode: Preview', requiresDocument: true },
   { id: 'view.mode.wysiwyg', label: 'Mode: WYSIWYG', requiresDocument: true },
   { id: 'view.mode.source', label: 'Mode: Source', requiresDocument: true },

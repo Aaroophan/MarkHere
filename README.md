@@ -12,6 +12,7 @@ This repository implements:
 - **Issue 4 — Implement the Markdown Dialect, Parsing, Safe Rendering, Resource Broker, and Preview Pipeline**
 - **Issue 5 — Implement Source, WYSIWYG, Preview, and Split Editing as Four First-Class Modes**
 - **Issue 6 — Implement the MarkHere Desktop Workspace, Navigation, Settings, Themes, Accessibility, and Productivity Features**
+- **Issue 7 — Implement the Unified Export Architecture for HTML, PDF, DOCX, and Printing**
 
 The 11 architecture documents in `docs/01-...` through `docs/11-...` are normative. `docs/12-implementation-plan,md` is the implementation backlog derived from them. When implementation and architecture disagree, resolve the architecture conflict explicitly rather than silently weakening a boundary.
 
@@ -78,6 +79,18 @@ See:
 - `docs/development/issue-06-implementation.md`
 - `docs/development/issue-06-validation.md`
 
+
+## Issue 7 unified export model
+
+Issue 7 exports an **immutable canonical Markdown revision**, never live editor/WYSIWYG DOM. Main owns `ExportCoordinator`, one-shot destination tokens, capability-scoped local asset resolution, cancellation/progress, isolated temp directories, and atomic final replacement. One process-neutral `ExportIR` is built with the same Markdown capability profile used elsewhere; standalone HTML, native DOCX, sanitized PDF print HTML, and native printing consume that IR.
+
+Long-running HTML/DOCX/print-document conversion runs in a bounded Electron `utilityProcess`. PDF and Print use a hidden `WindowManager`-created sandboxed BrowserWindow with no preload/Node/capabilities, loaded from a controlled script-free `markhere://print/<jobId>` document before `printToPDF()` or the native print dialog. DOCX uses the pinned `docx` package and emits native headings, relationships, numbering, tables, images, code styles, and page settings. Unsupported target fidelity such as Mermaid-to-image/DOCX math-image currently follows the ADR-022/023 explicit-diagnostic fallback rule rather than silently dropping content.
+
+See:
+
+- `docs/development/issue-07-implementation.md`
+- `docs/development/issue-07-validation.md`
+
 ## Pinned development baseline
 
 - Node.js `22.16.0`
@@ -95,6 +108,8 @@ See:
 - KaTeX `0.18.0`
 - PrismJS `1.30.0`
 - `@vscode/ripgrep` `1.18.0` for bounded, cancellable workspace search
+- `docx` `9.7.1` behind `@markhere/export-docx` for native OOXML generation
+- `sanitize-html` `2.17.7` + `@types/sanitize-html` `2.16.2` for standalone export HTML sanitization
 
 The sandboxed preload is fully bundled into a single CommonJS `index.cjs`; the Electron main process remains ESM.
 
@@ -110,6 +125,7 @@ pnpm check:document-lifecycle
 pnpm check:markdown-preview
 pnpm check:editor-modes
 pnpm check:desktop-workspace
+pnpm check:unified-export
 pnpm format:check
 pnpm lint
 pnpm typecheck
@@ -124,11 +140,11 @@ pnpm dev
 ## Repository map
 
 ```text
-apps/desktop/               Electron main/preload/Vue renderer/worker boundary
+apps/desktop/               Electron main/preload/Vue renderer + isolated export worker boundary
   src/main/                 lifecycle, WindowManager, protocols, IPC, services, commands
   src/preload/              one reviewed raw IPC transport + semantic contextBridge
   src/renderer/             sandboxed Vue application shell
-  src/workers/              reserved isolated worker boundary
+  src/workers/              isolated utility-process export worker boundary
   test/                     Main/security/document-lifecycle tests
 packages/document-model/    Process-neutral document identifiers/contracts
 packages/ipc-contract/      Bridge DTOs, channel maps, Zod runtime schemas
@@ -137,8 +153,8 @@ packages/preview-renderer/  Sanitized read-only preview, Mermaid, KaTeX, Prism, 
 packages/editor-session/    Four-mode orchestration; owns no canonical Markdown
 packages/editor-core/       Muya-backed WYSIWYG adapter boundary
 packages/source-editor/     CodeMirror 6 exact-source adapter boundary
-packages/export-core/       Process-neutral export contracts
-packages/export-*/          Format-specific exporter boundaries
+packages/export-core/       Shared process-neutral revision snapshot + semantic ExportIR
+packages/export-*/          HTML/PDF/DOCX format adapters
 packages/security-core/     Pure URL/security policy helpers
 packages/shared/            Pure reusable TypeScript utilities
 packages/test-fixtures/     Shared deterministic test fixtures
@@ -155,6 +171,7 @@ pnpm check:document-lifecycle
 pnpm check:markdown-preview
 pnpm check:editor-modes
 pnpm check:desktop-workspace
+pnpm check:unified-export
 pnpm graph:dependencies
 ```
 

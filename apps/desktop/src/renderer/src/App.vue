@@ -4,6 +4,8 @@ import type {
   AppCommandEvent,
   AppInfo,
   CommandId,
+  ExportJobKind,
+  ExportSnapshotRequestBase,
   KeybindingConfig,
   MarkHereSettings,
   OpenDocumentDTO,
@@ -22,6 +24,7 @@ import WorkspaceTree from './components/WorkspaceTree.vue'
 import WorkspaceSearch from './components/WorkspaceSearch.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import SettingsView from './components/SettingsView.vue'
+import ExportDialog from './components/ExportDialog.vue'
 
 const DEFAULT_SETTINGS: MarkHereSettings = {
   revision: 1,
@@ -50,6 +53,9 @@ const keybindings = ref<KeybindingConfig>(EMPTY_KEYBINDINGS)
 const recentFiles = ref<RecentItemDTO[]>([])
 const recentWorkspaces = ref<RecentItemDTO[]>([])
 const commandPaletteOpen = ref(false)
+const exportDialogOpen = ref(false)
+const exportDialogFormat = ref<ExportJobKind>('pdf')
+const exportSnapshot = ref<ExportSnapshotRequestBase | null>(null)
 const editorStatus = ref<{ mode: DocumentMode; line?: number; column?: number }>({ mode: 'preview' })
 const navigationAnchor = ref<StructuralAnchor>({ sourceLine: 0 })
 const sidebarPanel = ref<'files' | 'outline' | 'search'>('files')
@@ -329,13 +335,34 @@ function imageFromTransfer(items: FileList | null): File | null {
 function onPaste(event: ClipboardEvent): void { const file = imageFromTransfer(event.clipboardData?.files ?? null); if (!file) return; event.preventDefault(); void importImage(file) }
 function onDrop(event: DragEvent): void { const file = imageFromTransfer(event.dataTransfer?.files ?? null); if (!file) return; event.preventDefault(); void importImage(file) }
 
+async function openExportDialog(format: ExportJobKind): Promise<void> {
+  const currentId = activeDocument.value?.id
+  if (!currentId) return
+  await editor.value?.flushActiveEditable()
+  const session = documents.sessions[currentId]
+  if (!session) return
+  exportSnapshot.value = Object.freeze({
+    documentId: session.id,
+    revision: session.buffer.revision,
+    markdown: `${session.buffer.markdown}`,
+    title: session.title || 'Untitled',
+    textFormat: Object.freeze({ ...session.buffer.textFormat }),
+    ...(session.resourceScope.documentResourceScopeId ? { resourceScopeId: session.resourceScope.documentResourceScopeId } : {})
+  })
+  exportDialogFormat.value = format
+  exportDialogOpen.value = true
+}
+
 function registerCommands(): void {
   unsubscribers.push(commandRegistry.register('file.new', () => createUntitled()))
   unsubscribers.push(commandRegistry.register('file.open', () => selectMarkdown()))
   unsubscribers.push(commandRegistry.register('file.openFolder', () => openWorkspaceDialog()))
   unsubscribers.push(commandRegistry.register('file.save', () => { const id = activeDocument.value?.id; if (id) void saveDocumentById(id) }))
   unsubscribers.push(commandRegistry.register('file.saveAs', () => { void saveDocumentAs() }))
-  for (const id of ['file.export.html', 'file.export.pdf', 'file.export.docx'] as const) unsubscribers.push(commandRegistry.register(id, () => { notice.value = `${id} is implemented in Issue 7.` }))
+  unsubscribers.push(commandRegistry.register('file.export.html', () => { void openExportDialog('html') }))
+  unsubscribers.push(commandRegistry.register('file.export.pdf', () => { void openExportDialog('pdf') }))
+  unsubscribers.push(commandRegistry.register('file.export.docx', () => { void openExportDialog('docx') }))
+  unsubscribers.push(commandRegistry.register('file.print', () => { void openExportDialog('print') }))
   for (const [id, mode] of [['view.mode.preview', 'preview'], ['view.mode.wysiwyg', 'wysiwyg'], ['view.mode.source', 'source'], ['view.mode.split', 'split']] as ReadonlyArray<readonly [CommandId, DocumentMode]>) unsubscribers.push(commandRegistry.register(id, () => editor.value?.transition(mode)))
   unsubscribers.push(commandRegistry.register('edit.find', () => editor.value?.find()))
   unsubscribers.push(commandRegistry.register('edit.replace', () => editor.value?.replace()))
@@ -408,6 +435,8 @@ onBeforeUnmount(() => {
       <button type="button" @click="openWorkspaceDialog">Open Folder</button>
       <button type="button" :disabled="!activeDocument" @click="activeDocument && saveDocumentById(activeDocument.id)">Save</button>
       <button type="button" :disabled="!activeDocument" @click="saveDocumentAs()">Save As</button>
+      <button type="button" :disabled="!activeDocument" @click="openExportDialog('pdf')">Export…</button>
+      <button type="button" :disabled="!activeDocument" @click="openExportDialog('print')">Print…</button>
       <span class="spacer"></span>
       <button v-if="activeWorkspace" type="button" @click="closeWorkspace">Close Workspace</button>
     </nav>
@@ -498,6 +527,14 @@ onBeforeUnmount(() => {
     </footer>
 
     <CommandPalette :open="commandPaletteOpen" :has-document="!!activeDocument" :editable="hasEditableDocument" :keybindings="keybindings" :platform="platform" @close="commandPaletteOpen = false" @execute="executePaletteCommand" />
+    <ExportDialog
+      :open="exportDialogOpen"
+      :initial-format="exportDialogFormat"
+      :snapshot="exportSnapshot"
+      @close="exportDialogOpen = false; exportSnapshot = null"
+      @error="errorCode = $event"
+      @completed="notice = $event.success ? ($event.format === 'print' ? 'Print job completed.' : `Exported revision ${$event.sourceRevision}.`) : null"
+    />
   </main>
 </template>
 

@@ -45,6 +45,7 @@ export type CommandId =
   | 'file.export.html'
   | 'file.export.pdf'
   | 'file.export.docx'
+  | 'file.print'
   | 'view.mode.preview'
   | 'view.mode.wysiwyg'
   | 'view.mode.source'

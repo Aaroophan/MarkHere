@@ -3,7 +3,7 @@
   "version": "0.1.0-alpha.0",
   "private": true,
   "type": "module",
-  "description": "PDF export coordinator package boundary",
+  "description": "Hardened PDF print-document adapter for MarkHere",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@markhere/export-core": "workspace:*",
-    "@markhere/shared": "workspace:*"
+    "@markhere/shared": "workspace:*",
+    "@markhere/export-html": "workspace:*"
   }
 }

@@ -18,6 +18,12 @@ Issue 5 adds exact CodeMirror 6 runtime dependencies to `@markhere/source-editor
 
 Issue 6 uses exact dependency **`@vscode/ripgrep` 1.18.0** to provide the reviewed ripgrep executable used by the main-process workspace search service. Search is invoked directly with `shell: false`, remains scoped to a main-owned workspace root, is cancellable, and does not require a separately installed system `rg`. The package/ripgrep license notice must also be emitted by the lockfile-derived compliance generator before distribution.
 
+## Issue 7 export dependencies
+
+Issue 7 uses exact **`docx` 9.7.1** behind `@markhere/export-docx` for native OOXML package generation. It does not automate an installed copy of Microsoft Word, LibreOffice, or Pandoc. Standalone/export print HTML uses exact **`sanitize-html` 2.17.7** with TypeScript declarations **`@types/sanitize-html` 2.16.2**. KaTeX `0.18.0`, already part of MarkHere's reviewed Markdown rendering baseline, is reused by the process-neutral HTML exporter for static MathML output.
+
+Package-level copyrights/licenses for these production dependencies must be emitted by the lockfile-derived compliance generator before redistribution. This summary does not replace those generated notices.
+
 ## MarkText reference material
 
 MarkText remains an architectural and behavioral reference. The MarkText MIT license is retained at `docs/provenance/licenses/MARKTEXT-MIT.txt` for previously recorded provenance/reference use. Any future copied or materially adapted source must be marked with `@markhere-upstream`, entered in `docs/provenance/provenance.json`, and distributed with its applicable notice.

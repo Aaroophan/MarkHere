@@ -10,7 +10,6 @@ import {
   type WorkspaceEntry,
   type ResolvedDocumentLink,
   type RecoveryUpdateResult,
-  type ExportJobDTO,
   type UpdateStatus
 } from '@markhere/ipc-contract'
 import type { TrustedWebContentsRegistry } from '../security/trusted-web-contents-registry'
@@ -27,6 +26,7 @@ import type { ResourceService } from '../resources/resource-service'
 import type { SettingsService } from '../storage/settings-service'
 import type { KeybindingService } from '../storage/keybinding-service'
 import type { WorkspaceService } from '../workspace/workspace-service'
+import type { ExportCoordinator } from '../export/export-coordinator'
 import type { SelectionTokenKind, SelectionTokenStore } from '../services/selection-token-store'
 import { failure } from '../services/api-results'
 import { registerValidatedInvoke, registerValidatedSend } from './validated-ipc'
@@ -46,6 +46,7 @@ export interface IpcServices {
   readonly settings: SettingsService
   readonly keybindings: KeybindingService
   readonly workspace: WorkspaceService
+  readonly exports: ExportCoordinator
   readonly future: FutureService
 }
 
@@ -182,13 +183,13 @@ export function registerIpcHandlers(services: IpcServices): void {
       ?? services.recovery.discardForDocument(documentId, throughRevision))
 
   registerValidatedInvoke(trusted, CHANNELS.exportStart, (_event, sender, request) =>
-    ownedOrFailure<{ jobId: string }>(capabilities, request.documentId, 'document', sender.webContentsId)
-      ?? selectionOrFailure<{ jobId: string }>(selections, request.targetSelectionToken, 'export-target', sender.webContentsId)
-      ?? services.future.unavailable('exports.start'))
+    selectionOrFailure<{ jobId: string }>(selections, request.targetSelectionToken, 'export-target', sender.webContentsId)
+      ?? services.exports.start(request, sender.webContentsId))
+  registerValidatedInvoke(trusted, CHANNELS.exportPrint, (_event, sender, request) =>
+    services.exports.print(request, sender.webContentsId))
   registerValidatedInvoke(trusted, CHANNELS.exportGetStatus, (_event, sender, jobId) =>
-    ownedOrFailure<ExportJobDTO>(capabilities, jobId, 'export-job', sender.webContentsId)
-      ?? services.future.unavailable('exports.getStatus'))
-  registerValidatedSend(trusted, CHANNELS.exportCancel, () => undefined)
+    services.exports.getStatus(jobId, sender.webContentsId))
+  registerValidatedSend(trusted, CHANNELS.exportCancel, (_event, sender, jobId) => services.exports.cancel(jobId, sender.webContentsId))
 
   registerValidatedInvoke(trusted, CHANNELS.shellOpenExternal, (_event, _sender, url) => services.shell.openExternal(url))
   registerValidatedInvoke(trusted, CHANNELS.shellShowItemInFolder, (_event, sender, documentId) =>

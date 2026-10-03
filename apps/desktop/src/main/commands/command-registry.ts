@@ -29,6 +29,7 @@ export const COMMAND_DEFINITIONS: readonly CommandDefinition[] = Object.freeze([
   { id: 'file.export.html', label: 'Export HTML…', target: 'renderer', when: 'document' },
   { id: 'file.export.pdf', label: 'Export PDF…', target: 'renderer', when: 'document' },
   { id: 'file.export.docx', label: 'Export Word…', target: 'renderer', when: 'document' },
+  { id: 'file.print', label: 'Print…', accelerator: 'CmdOrCtrl+P', target: 'renderer', when: 'document' },
   { id: 'view.mode.preview', label: 'Preview', accelerator: 'CmdOrCtrl+1', target: 'renderer', when: 'document' },
   { id: 'view.mode.wysiwyg', label: 'WYSIWYG', accelerator: 'CmdOrCtrl+2', target: 'renderer', when: 'document' },
   { id: 'view.mode.source', label: 'Source', accelerator: 'CmdOrCtrl+3', target: 'renderer', when: 'document' },

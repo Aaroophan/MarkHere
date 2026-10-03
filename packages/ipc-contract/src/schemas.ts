@@ -36,14 +36,62 @@ export const SaveDocumentAsRequestSchema = SaveDocumentRequestSchema.omit({ expe
   targetSelectionToken: token
 }).strict()
 
-export const StartExportRequestSchema = z.object({
+const CommonExportOptionsShape = {
+  documentTitle: z.string().max(512).optional(),
+  themeId: boundedString(128),
+  includeFrontMatter: z.boolean(),
+  includeTableOfContents: z.boolean()
+} as const
+
+export const HtmlExportOptionsSchema = z.object({
+  ...CommonExportOptionsShape,
+  imagePolicy: z.enum(['embed-local', 'reference'])
+}).strict()
+
+const PdfMarginsMmSchema = z.object({
+  top: z.number().finite().min(0).max(50),
+  right: z.number().finite().min(0).max(50),
+  bottom: z.number().finite().min(0).max(50),
+  left: z.number().finite().min(0).max(50)
+}).strict()
+
+export const PdfExportOptionsSchema = z.object({
+  ...CommonExportOptionsShape,
+  pageSize: z.enum(['A4', 'A3', 'Letter', 'Legal']),
+  orientation: z.enum(['portrait', 'landscape']),
+  marginsMm: PdfMarginsMmSchema,
+  printBackground: z.boolean(),
+  displayHeaderFooter: z.boolean(),
+  headerTemplate: z.string().max(4096).optional(),
+  footerTemplate: z.string().max(4096).optional()
+}).strict()
+
+export const DocxExportOptionsSchema = z.object({
+  ...CommonExportOptionsShape,
+  pageSize: z.enum(['A4', 'Letter']),
+  orientation: z.enum(['portrait', 'landscape']),
+  includePageNumbers: z.boolean(),
+  codeStyle: z.enum(['shaded', 'plain']),
+  diagramMode: z.enum(['svg-if-compatible', 'png']),
+  mathMode: z.enum(['image', 'text-fallback'])
+}).strict()
+
+const ExportSnapshotRequestShape = {
   documentId: id,
   revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   markdown: z.string().max(32 * 1024 * 1024),
-  format: exportFormat,
-  options: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
-  targetSelectionToken: token
-}).strict()
+  title: boundedString(512),
+  textFormat: TextFormatMetadataSchema,
+  resourceScopeId: id.optional()
+} as const
+
+export const StartExportRequestSchema = z.discriminatedUnion('format', [
+  z.object({ ...ExportSnapshotRequestShape, format: z.literal('html'), options: HtmlExportOptionsSchema, targetSelectionToken: token }).strict(),
+  z.object({ ...ExportSnapshotRequestShape, format: z.literal('pdf'), options: PdfExportOptionsSchema, targetSelectionToken: token }).strict(),
+  z.object({ ...ExportSnapshotRequestShape, format: z.literal('docx'), options: DocxExportOptionsSchema, targetSelectionToken: token }).strict()
+])
+
+export const PrintRequestSchema = z.object({ ...ExportSnapshotRequestShape, options: PdfExportOptionsSchema }).strict()
 
 export const ConfirmDialogRequestSchema = z.object({
   title: z.string().min(1).max(160),
@@ -70,7 +118,7 @@ export const SettingsPatchSchema = z.object({
 export const AppCommandEventSchema = z.object({
   id: z.enum([
     'file.new', 'file.open', 'file.openFolder', 'file.save', 'file.saveAs',
-    'file.export.html', 'file.export.pdf', 'file.export.docx',
+    'file.export.html', 'file.export.pdf', 'file.export.docx', 'file.print',
     'view.mode.preview', 'view.mode.wysiwyg', 'view.mode.source', 'view.mode.split',
     'edit.find', 'edit.replace', 'app.settings', 'app.commandPalette', 'app.quit'
   ]),
@@ -96,19 +144,36 @@ export const WorkspaceChangeEventSchema = z.object({
   relativePath: boundedString(4096)
 }).strict()
 
-export const ExportProgressEventSchema = z.object({
-  jobId: id,
-  phase: z.enum(['preparing', 'assets', 'rendering', 'packaging', 'writing']),
+const exportJobKind = z.enum(['html', 'pdf', 'docx', 'print'])
+const exportStatus = z.enum(['queued', 'preparing', 'resolving-assets', 'rendering', 'writing', 'completed', 'failed', 'cancelled'])
+const ExportProgressSchema = z.object({
+  phase: z.enum(['preparing', 'assets', 'rendering', 'packaging', 'writing', 'finishing']),
   completed: z.number().nonnegative().optional(),
   total: z.number().positive().optional(),
-  percent: z.number().min(0).max(100).optional()
+  percent: z.number().min(0).max(100).optional(),
+  messageKey: z.string().max(160).optional()
+}).strict()
+
+export const ExportProgressEventSchema = z.object({
+  jobId: id,
+  documentId: id,
+  sourceRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  format: exportJobKind,
+  status: exportStatus,
+  progress: ExportProgressSchema
 }).strict()
 
 export const ExportCompletedEventSchema = z.object({
   jobId: id,
+  documentId: id,
+  sourceRevision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  format: exportJobKind,
   success: z.boolean(),
+  cancelled: z.boolean(),
+  correlationId: id,
   displayPath: z.string().max(32768).optional(),
-  errorCode: z.string().max(128).optional()
+  errorCode: z.string().max(128).optional(),
+  diagnosticCodes: z.array(z.string().max(128)).max(128).optional()
 }).strict()
 
 export const UpdateStatusSchema = z.object({
@@ -201,6 +266,7 @@ export const INVOKE_ARG_SCHEMAS: Record<InvokeChannel, z.ZodType> = {
   [CHANNELS.recoveryDiscard]: oneId,
   [CHANNELS.recoveryDiscardForDocument]: z.tuple([id, z.number().int().nonnegative().optional()]),
   [CHANNELS.exportStart]: z.tuple([StartExportRequestSchema]),
+  [CHANNELS.exportPrint]: z.tuple([PrintRequestSchema]),
   [CHANNELS.exportGetStatus]: oneId,
   [CHANNELS.shellOpenExternal]: z.tuple([z.string().min(1).max(8192)]),
   [CHANNELS.shellShowItemInFolder]: oneId,

@@ -154,6 +154,25 @@ export class ResourceCapabilityBroker {
     }
   }
 
+  async resolveExportResource(scopeId: string, rawTarget: string, ownerWebContentsId: number): Promise<ResourceResolution> {
+    if (!this.ownsScope(scopeId, ownerWebContentsId)) return { ok: false, status: 403, reason: 'resource-scope-not-owned' }
+    const target = rawTarget.trim()
+    if (!target || CONTROL_CHARACTER.test(target) || target.startsWith('//') || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(target)) {
+      return { ok: false, status: 403, reason: 'export-resource-not-local' }
+    }
+    if (/^[A-Za-z]:[\\/]/u.test(target) || target.startsWith('/') || target.startsWith('\\')) {
+      return { ok: false, status: 403, reason: 'export-resource-absolute' }
+    }
+    const pathOnly = target.split(/[?#]/u, 1)[0] ?? ''
+    let decoded: string
+    try { decoded = decodeURIComponent(pathOnly).replaceAll('\\', '/') } catch {
+      return { ok: false, status: 400, reason: 'export-resource-encoding' }
+    }
+    decoded = decoded.replace(/^\.\//u, '')
+    if (!decoded) return { ok: false, status: 400, reason: 'export-resource-empty' }
+    return this.resolveProtocolRequest(`markhere-resource://${scopeId}/r/${encodeURIComponent(decoded)}`)
+  }
+
   async resolveProtocolRequest(rawUrl: string): Promise<ResourceResolution> {
     if (!rawUrl || rawUrl.length > MAX_RESOURCE_URL_LENGTH || CONTROL_CHARACTER.test(rawUrl)) {
       return { ok: false, status: 400, reason: 'invalid-resource-url' }

@@ -34,6 +34,12 @@ import { WorkspaceCapabilityRegistry } from './workspace/workspace-capability-re
 import { WorkspaceWatchService } from './workspace/workspace-watch-service'
 import { WorkspaceSearchService } from './workspace/workspace-search-service'
 import { WorkspaceService } from './workspace/workspace-service'
+import { ExportAssetResolver } from './export/export-asset-resolver'
+import { ExportTempStorage } from './export/export-temp-storage'
+import { ExportWorkerClient } from './export/export-worker-client'
+import { PdfPrintSurface } from './export/pdf-print-surface'
+import { ExportCoordinator } from './export/export-coordinator'
+import { PrintDocumentStore } from './export/print-document-store'
 
 registerPrivilegedSchemes()
 app.enableSandbox()
@@ -51,8 +57,9 @@ async function boot(): Promise<void> {
   const selections = new SelectionTokenStore()
   const fileCapabilities = new FileCapabilityRegistry(capabilities)
   const resourceBroker = new ResourceCapabilityBroker(capabilities)
+  const printDocuments = new PrintDocumentStore()
   const resources = new ResourceService(fileCapabilities, selections, resourceBroker)
-  installAppProtocolHandlers(undefined, resourceBroker)
+  installAppProtocolHandlers(undefined, resourceBroker, printDocuments)
   const recovery = new RecoveryService()
   const recents = new RecentDocumentStore()
   const sessionPersistence = new SessionPersistenceService()
@@ -73,6 +80,7 @@ async function boot(): Promise<void> {
   })
   let commands: ApplicationCommandRegistry | undefined
   let workspace: WorkspaceService | undefined
+  let exportCoordinator: ExportCoordinator | undefined
   const files = new FileService({
     selections, files: fileCapabilities, watch, recents, resources: resourceBroker,
     onSaved: async (documentId, revision) => { await recovery.discardForDocument(documentId, revision) },
@@ -115,6 +123,7 @@ async function boot(): Promise<void> {
     },
     onRendererReady: (webContentsId) => lifecycle.markRendererReady(webContentsId),
     onWindowDestroyed: (webContentsId) => {
+      exportCoordinator?.cancelAllForWebContents(webContentsId)
       selections.revokeAllForWebContents(webContentsId)
       resourceBroker.revokeAllForWebContents(webContentsId)
       for (const documentId of fileCapabilities.revokeAllForWebContents(webContentsId)) watch.unwatchDocument(documentId)
@@ -152,6 +161,23 @@ async function boot(): Promise<void> {
   })
   workspace = new WorkspaceService({ selections, capabilities: workspaceCapabilities, files, recents, watch: workspaceWatch, search: workspaceSearch })
 
+  const exportTemp = new ExportTempStorage(app.getPath('temp'))
+  const exportWorker = new ExportWorkerClient()
+  const pdfPrintSurface = new PdfPrintSurface(windows, printDocuments)
+  exportCoordinator = new ExportCoordinator({
+    capabilities,
+    selections,
+    assets: new ExportAssetResolver(resourceBroker),
+    temp: exportTemp,
+    worker: exportWorker,
+    printSurface: pdfPrintSurface,
+    events: {
+      progress: (ownerWebContentsId, event) => { const target = webContents.fromId(ownerWebContentsId); if (target) events.send(target, CHANNELS.eventExportProgress, event) },
+      completed: (ownerWebContentsId, event) => { const target = webContents.fromId(ownerWebContentsId); if (target) events.send(target, CHANNELS.eventExportCompleted, event) }
+    }
+  })
+  await exportCoordinator.initialize()
+
   const persistSession = async (): Promise<void> => {
     const currentSettings = await settings.get()
     const defaultMode = currentSettings.ok ? currentSettings.data.defaultMode : 'preview'
@@ -161,7 +187,7 @@ async function boot(): Promise<void> {
   }
   const sessionTimer = setInterval(() => { void persistSession() }, 5_000)
   sessionTimer.unref()
-  app.once('before-quit', () => { clearInterval(sessionTimer); void persistSession() })
+  app.once('before-quit', () => { clearInterval(sessionTimer); exportCoordinator?.shutdown(); void persistSession() })
 
   const appService = new AppService(windows, () => lifecycle.requestQuit())
   registerIpcHandlers({
@@ -179,6 +205,7 @@ async function boot(): Promise<void> {
     settings,
     keybindings,
     workspace,
+    exports: exportCoordinator,
     future: new FutureService()
   })
 

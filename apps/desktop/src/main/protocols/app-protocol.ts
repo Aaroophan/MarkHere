@@ -4,6 +4,7 @@ import { isAbsolute, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { MARKHERE_IDENTITY } from '@markhere/shared'
 import type { ResourceCapabilityBroker } from '../resources/resource-capability-broker'
+import type { PrintDocumentStore } from '../export/print-document-store'
 import { resolveAppProtocolRequest } from './app-protocol-path'
 
 const APPLICATION_HOST = 'app'
@@ -78,7 +79,8 @@ function resourceHeaders(mimeType: string, svg: boolean): Headers {
 
 export function installAppProtocolHandlers(
   rendererRoot = getPackagedRendererRoot(),
-  resources?: ResourceCapabilityBroker
+  resources?: ResourceCapabilityBroker,
+  printDocuments?: PrintDocumentStore
 ): void {
   // Electron's ProtocolRequest intentionally does not expose the requesting
   // WebContents. Enforce capability ownership one layer earlier through the
@@ -124,6 +126,23 @@ export function installAppProtocolHandlers(
   )
 
   protocol.handle(MARKHERE_IDENTITY.appProtocol, async (request) => {
+    let parsed: URL
+    try { parsed = new URL(request.url) } catch { return errorResponse(400, 'Invalid MarkHere application request.') }
+    if (parsed.host === 'print') {
+      if (parsed.search || parsed.hash || parsed.username || parsed.password || parsed.port) return errorResponse(400, 'Invalid MarkHere print request.')
+      const jobId = parsed.pathname.replace(/^\/+|\/+$/gu, '')
+      const html = printDocuments?.get(jobId)
+      if (!html) return errorResponse(404, 'Print document is unavailable.')
+      return new Response(html, {
+        status: 200,
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-store',
+          'x-content-type-options': 'nosniff',
+          'content-security-policy': "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; script-src 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+        }
+      })
+    }
     const resolution = resolveAppProtocolRequest(request.url, rendererRoot)
     if (!resolution.ok || !resolution.filePath || !resolution.mimeType) {
       return errorResponse(resolution.status, 'Blocked MarkHere application resource request.')

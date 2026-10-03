@@ -18,7 +18,7 @@ import type {
   SaveDocumentRequest,
   SaveDocumentResult
 } from './dto/files'
-import type { ExportJobDTO, StartExportRequest } from './dto/export'
+import type { ExportJobDTO, PrintRequest, StartExportRequest } from './dto/export'
 import type {
   ImportLocalImageRequest,
   ResolveDocumentLinkRequest,
@@ -118,6 +118,7 @@ export const CHANNELS = Object.freeze({
   recoveryDiscard: 'mh:v1:recovery:discard',
   recoveryDiscardForDocument: 'mh:v1:recovery:discard-for-document',
   exportStart: 'mh:v1:export:start',
+  exportPrint: 'mh:v1:export:print',
   exportCancel: 'mh:v1:export:cancel',
   exportGetStatus: 'mh:v1:export:get-status',
   shellOpenExternal: 'mh:v1:shell:open-external',
@@ -196,6 +197,7 @@ export interface InvokeChannelMap {
   [CHANNELS.recoveryDiscard]: { args: [snapshotId: string]; result: ApiResult<void> }
   [CHANNELS.recoveryDiscardForDocument]: { args: [documentId: string, throughRevision?: number]; result: ApiResult<void> }
   [CHANNELS.exportStart]: { args: [request: StartExportRequest]; result: ApiResult<{ jobId: string }> }
+  [CHANNELS.exportPrint]: { args: [request: PrintRequest]; result: ApiResult<{ jobId: string }> }
   [CHANNELS.exportGetStatus]: { args: [jobId: string]; result: ApiResult<ExportJobDTO> }
   [CHANNELS.shellOpenExternal]: { args: [url: string]; result: ApiResult<void> }
   [CHANNELS.shellShowItemInFolder]: { args: [documentId: string]; result: ApiResult<void> }
