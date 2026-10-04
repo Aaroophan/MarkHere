@@ -1,0 +1,36 @@
+name: Nightly Qualification
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  nightly-windows-x64:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.33.4, run_install: false }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22.16.0, cache: pnpm }
+      - shell: pwsh
+        run: if (-not (Test-Path pnpm-lock.yaml)) { throw 'pnpm-lock.yaml is required' }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm generate:performance-fixtures
+      - run: pnpm build
+      - run: pnpm test:unit
+      - run: pnpm test:conformance
+      - run: pnpm test:e2e
+      - run: pnpm test:performance
+      - run: pnpm test:soak
+      - run: pnpm audit:dependencies
+      - run: pnpm check:security-regression
+      - run: pnpm check:traceability
+      - run: node scripts/generate-compatibility-report.mjs test-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nightly-qualification-evidence
+          path: test-results/
+          if-no-files-found: ignore

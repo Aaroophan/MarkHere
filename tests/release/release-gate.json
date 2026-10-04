@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "blockers": [
+    "security-regression", "data-loss", "silent-external-overwrite", "commonmark-regression",
+    "mode-transition-data-loss", "docx-repair", "pdf-hang", "installer-failure", "untrusted-update",
+    "missing-license-notices", "recovery-overwrites-newer-disk"
+  ],
+  "requiredAutomatedEvidence": [
+    "unit", "commonmark-gfm", "security-corpus", "atomic-save", "export-structural", "electron-e2e",
+    "accessibility-automated", "performance", "fuses", "signature", "dependency-audit", "license-provenance", "sbom"
+  ],
+  "requiredManualGates": ["RC-WINDOWS-SYSTEM", "RC-UPDATER", "RC-A11Y", "RC-EXPORT-WORD", "RC-EXPORT-PDF"]
+}

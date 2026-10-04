@@ -1,0 +1,5 @@
+{
+  "valid": ["simple.md", "with spaces.md", "C# notes.md", "100% coverage.md", "සිංහල.md", "தமிழ்.md", "中文标题.md", "emoji-📝.md", "mixed.Case.MarkDown"],
+  "parserOnly": ["what?.md", "folder\\..\\secret.md", "C:\\temp\\note.md", "\\\\server\\share\\note.md", "\\\\?\\C:\\secret.md"],
+  "urlConfusion": ["notes.md?query", "notes.md#fragment", "100%25.md", "%2e%2e/secret.md"]
+}

@@ -24,8 +24,6 @@
   !insertmacro RegisterMarkHereExtension "mdtxt"
   WriteRegStr HKCU "Software\Classes\Applications\markhere.exe\shell\open\command" "" '"$INSTDIR\markhere.exe" "%1"'
   WriteRegStr HKCU "Software\Classes\Applications\markhere.exe" "FriendlyAppName" "MarkHere"
-  WriteRegStr HKCU "Software\Classes\Applications\markhere.exe" "NoOpenWith" ""
-  DeleteRegValue HKCU "Software\Classes\Applications\markhere.exe" "NoOpenWith"
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 !macroend
 

@@ -12,3 +12,6 @@ artifacts/
 apps/desktop/.vite/
 apps/desktop/out/
 /docs
+/docstest-results/
+playwright-report/
+blob-report/

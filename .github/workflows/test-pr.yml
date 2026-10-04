@@ -1,0 +1,45 @@
+name: Test PR
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.33.4, run_install: false }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22.16.0, cache: pnpm }
+      - run: test -f pnpm-lock.yaml || (echo 'pnpm-lock.yaml is required' && exit 1)
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test:unit
+      - run: pnpm test:conformance
+      - run: pnpm check:foundation
+      - run: pnpm check:secure-shell
+      - run: pnpm check:document-lifecycle
+      - run: pnpm check:markdown-preview
+      - run: pnpm check:editor-modes
+      - run: pnpm check:desktop-workspace
+      - run: pnpm check:unified-export
+      - run: pnpm check:security-hardening
+      - run: pnpm check:security-regression
+      - run: pnpm check:deployment
+      - run: pnpm check:test-program
+      - run: pnpm check:traceability
+      - run: pnpm compliance
+      - run: pnpm build
+      - name: Electron E2E smoke and accessibility
+        run: xvfb-run -a pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr-test-evidence
+          path: test-results/
+          if-no-files-found: ignore

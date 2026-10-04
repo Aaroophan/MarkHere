@@ -39,3 +39,7 @@ Security sanitizer regression tests use exact development dependency **jsdom 30.
 ## electron-builder / electron-updater / @electron/fuses
 
 Issue 9 uses exact reviewed packaging dependencies **electron-builder 26.15.3**, **electron-updater 6.8.9**, and **@electron/fuses 2.1.3**. They are used for Windows NSIS/ZIP packaging, main-process update integration, and package-time Electron fuse hardening respectively. Their transitive license inventory remains governed by the lockfile-derived compliance generator before release.
+
+## Issue 10 test-only quality dependencies
+
+Issue 10 uses exact development-only dependencies **@playwright/test 1.63.0** (Apache-2.0), **@axe-core/playwright 4.13.0**, **fast-check 4.10.2**, **pdfjs-dist 6.3.289** (Apache-2.0), **jszip 3.10.1**, and **commonmark-spec 0.31.2** (CC-BY-SA-4.0) for release qualification. These packages are test/conformance tooling and are excluded from the packaged MarkHere runtime unless already required by a production dependency. The official CommonMark examples remain attributed to the CommonMark project/spec license.

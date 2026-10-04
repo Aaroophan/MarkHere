@@ -26,7 +26,7 @@
     "licenses": "node scripts/compliance.mjs licenses",
     "sbom": "node scripts/compliance.mjs sbom",
     "compliance": "node scripts/compliance.mjs all",
-    "ci:foundation": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm check:foundation && pnpm check:secure-shell && pnpm check:document-lifecycle && pnpm check:markdown-preview && pnpm check:editor-modes && pnpm check:desktop-workspace && pnpm check:unified-export && pnpm check:security-hardening && pnpm check:security-regression && pnpm check:deployment && pnpm compliance && pnpm build",
+    "ci:foundation": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm check:foundation && pnpm check:secure-shell && pnpm check:document-lifecycle && pnpm check:markdown-preview && pnpm check:editor-modes && pnpm check:desktop-workspace && pnpm check:unified-export && pnpm check:security-hardening && pnpm check:security-regression && pnpm check:deployment && pnpm check:test-program && pnpm check:traceability && pnpm check:fixture-privacy && pnpm compliance && pnpm build",
     "graph:dependencies": "node scripts/generate-dependency-graph.mjs",
     "check:manifests": "node scripts/check-manifests.mjs",
     "check:secure-shell": "node scripts/verify-secure-shell.mjs",
@@ -45,7 +45,23 @@
     "release:manifest": "node scripts/release/generate-release-manifest.mjs",
     "release:checksums": "node scripts/release/generate-checksums.mjs",
     "release:verify-signatures": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release/verify-authenticode.ps1",
-    "release:verify-fuses": "node scripts/release/verify-fuses.mjs"
+    "release:verify-fuses": "node scripts/release/verify-fuses.mjs",
+    "test:unit": "pnpm -r --if-present run test",
+    "test:conformance": "pnpm --filter @markhere/markdown-engine test:conformance",
+    "test:e2e": "playwright test -c playwright.config.ts",
+    "test:a11y": "playwright test -c playwright.config.ts --grep @a11y",
+    "test:performance": "playwright test -c playwright.performance.config.ts",
+    "test:nightly": "pnpm check:test-program && pnpm test:unit && pnpm test:conformance && pnpm test:e2e && pnpm test:performance",
+    "check:traceability": "node scripts/verify-requirement-traceability.mjs",
+    "check:test-program": "node scripts/verify-test-program.mjs",
+    "check:release-acceptance": "node scripts/verify-release-acceptance.mjs",
+    "test:windows-system": "powershell -NoProfile -ExecutionPolicy Bypass -File tests/windows/system-acceptance.ps1",
+    "test:soak": "playwright test -c playwright.performance.config.ts --grep @soak",
+    "generate:performance-fixtures": "node scripts/generate-performance-fixtures.mjs",
+    "report:compatibility": "node scripts/generate-compatibility-report.mjs",
+    "check:fixture-privacy": "node scripts/verify-fixture-privacy.mjs",
+    "release:inspect-package": "node scripts/inspect-package-contents.mjs",
+    "release:evidence-template": "node scripts/create-release-evidence.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",
@@ -57,6 +73,11 @@
     "vue-eslint-parser": "10.4.1",
     "vitest": "4.1.9",
     "electron-builder": "26.15.3",
-    "@electron/fuses": "2.1.3"
+    "@electron/fuses": "2.1.3",
+    "@playwright/test": "1.63.0",
+    "@axe-core/playwright": "4.13.0",
+    "fast-check": "4.10.2",
+    "pdfjs-dist": "6.3.289",
+    "jszip": "3.10.1"
   }
 }

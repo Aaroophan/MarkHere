@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "candidateSha256": "FILL_FROM_CANDIDATE",
+  "qualifiedCandidateSha256": "FILL_AFTER_QUALIFICATION",
+  "automated": {
+    "unit": "pending",
+    "commonmark-gfm": "pending",
+    "security-corpus": "pending",
+    "atomic-save": "pending",
+    "export-structural": "pending",
+    "electron-e2e": "pending",
+    "accessibility-automated": "pending",
+    "performance": "pending",
+    "fuses": "pending",
+    "signature": "pending",
+    "dependency-audit": "pending",
+    "license-provenance": "pending",
+    "sbom": "pending"
+  },
+  "manual": {
+    "RC-WINDOWS-SYSTEM": "pending",
+    "RC-UPDATER": "pending",
+    "RC-A11Y": "pending",
+    "RC-EXPORT-WORD": "pending",
+    "RC-EXPORT-PDF": "pending"
+  },
+  "openBlockers": []
+}

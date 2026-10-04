@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "gates": {
+    "RC-WINDOWS-SYSTEM": { "evidence": "tests/windows/system-acceptance.ps1", "releaseBlocking": true },
+    "RC-UPDATER": { "evidence": "docs/development/issue-09-validation.md", "releaseBlocking": true },
+    "RC-A11Y": { "evidence": "tests/windows/manual-accessibility.md", "releaseBlocking": true },
+    "RC-EXPORT-WORD": { "evidence": "tests/windows/manual-interoperability.md", "releaseBlocking": true },
+    "RC-EXPORT-PDF": { "evidence": "tests/windows/manual-interoperability.md", "releaseBlocking": true }
+  }
+}

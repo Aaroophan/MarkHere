@@ -1,0 +1,1800 @@
+{
+  "schemaVersion": 1,
+  "requirements": {
+    "FR-APP-001": {
+      "priority": "P0",
+      "requirement": "MarkHere shall launch from Start menu, Explorer file open, command line, and application executable.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 2",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/close-coordinator.test.ts"
+      ],
+      "manualGate": "RC-WINDOWS-SYSTEM"
+    },
+    "FR-APP-002": {
+      "priority": "P0",
+      "requirement": "Installed MarkHere shall use a single-instance coordinator by default.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 2",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/close-coordinator.test.ts"
+      ]
+    },
+    "FR-APP-003": {
+      "priority": "P1",
+      "requirement": "MarkHere shall support multiple editor windows when requested.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 2",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/close-coordinator.test.ts"
+      ]
+    },
+    "FR-APP-004": {
+      "priority": "P1",
+      "requirement": "MarkHere shall restore safe window geometry after normal restart.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 2",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/close-coordinator.test.ts"
+      ]
+    },
+    "FR-APP-005": {
+      "priority": "P0",
+      "requirement": "MarkHere shall never close a window with unsaved work without a save/discard/cancel decision or an already configured safe autosave policy.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 2",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/close-coordinator.test.ts"
+      ]
+    },
+    "FR-APP-006": {
+      "priority": "P1",
+      "requirement": "MarkHere shall expose an About view containing version, Electron/Chromium versions, license links, and third-party notices.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 2",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/close-coordinator.test.ts"
+      ]
+    },
+    "FR-FILE-001": {
+      "priority": "P0",
+      "requirement": "MarkHere shall open `.md` and `.markdown`.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/text-codec.test.ts",
+        "apps/desktop/test/main/startup-arguments.test.ts"
+      ],
+      "manualGate": "RC-WINDOWS-SYSTEM"
+    },
+    "FR-FILE-002": {
+      "priority": "P1",
+      "requirement": "MarkHere should also recognize `.mmd`, `.mdown`, `.mdtext`, and `.mdtxt`.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/text-codec.test.ts",
+        "apps/desktop/test/main/startup-arguments.test.ts"
+      ]
+    },
+    "FR-FILE-003": {
+      "priority": "P1",
+      "requirement": "`.mdx` may be opened as source text, but MarkHere shall not execute embedded JSX/JavaScript in v1.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/text-codec.test.ts",
+        "apps/desktop/test/main/startup-arguments.test.ts"
+      ]
+    },
+    "FR-FILE-004": {
+      "priority": "P0",
+      "requirement": "MarkHere shall create a new untitled Markdown document without immediately forcing a file location.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/text-codec.test.ts",
+        "apps/desktop/test/main/startup-arguments.test.ts"
+      ]
+    },
+    "FR-FILE-005": {
+      "priority": "P1",
+      "requirement": "Open-file dialog shall allow selecting multiple supported documents.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/text-codec.test.ts",
+        "apps/desktop/test/main/startup-arguments.test.ts"
+      ]
+    },
+    "FR-FILE-006": {
+      "priority": "P1",
+      "requirement": "Dragging supported files onto a window shall open them.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/text-codec.test.ts",
+        "apps/desktop/test/main/startup-arguments.test.ts"
+      ]
+    },
+    "FR-FILE-007": {
+      "priority": "P1",
+      "requirement": "A file already open in the same window shall not create an accidental duplicate tab unless explicit duplicate-view behavior exists.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/text-codec.test.ts",
+        "apps/desktop/test/main/startup-arguments.test.ts"
+      ]
+    },
+    "FR-FILE-008": {
+      "priority": "P0",
+      "requirement": "MarkHere shall handle Unicode filenames and paths.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/text-codec.test.ts",
+        "apps/desktop/test/main/startup-arguments.test.ts"
+      ],
+      "manualGate": "RC-WINDOWS-SYSTEM"
+    },
+    "FR-FILE-009": {
+      "priority": "P0",
+      "requirement": "MarkHere shall handle spaces and `#`, `%`, `?`, `&`, parentheses, and brackets in local paths without treating them as URL syntax.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/text-codec.test.ts",
+        "apps/desktop/test/main/startup-arguments.test.ts"
+      ]
+    },
+    "FR-FILE-010": {
+      "priority": "P1",
+      "requirement": "Long-path behavior shall be tested and shall fail with an actionable error rather than truncated/corrupt paths.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "tests/e2e/electron-smoke.spec.ts",
+        "apps/desktop/test/main/text-codec.test.ts",
+        "apps/desktop/test/main/startup-arguments.test.ts"
+      ]
+    },
+    "FR-SAVE-001": {
+      "priority": "P0",
+      "requirement": "Save shall write the current canonical Markdown buffer.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "packages/document-model/src/state-machine.property.test.ts",
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "apps/desktop/test/main/save-queue.test.ts"
+      ]
+    },
+    "FR-SAVE-002": {
+      "priority": "P0",
+      "requirement": "Save As shall update document identity only after successful write.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "packages/document-model/src/state-machine.property.test.ts",
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "apps/desktop/test/main/save-queue.test.ts"
+      ]
+    },
+    "FR-SAVE-003": {
+      "priority": "P0",
+      "requirement": "Writes shall use an atomic/replace strategy to minimize partial-file corruption.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "packages/document-model/src/state-machine.property.test.ts",
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "apps/desktop/test/main/save-queue.test.ts"
+      ]
+    },
+    "FR-SAVE-004": {
+      "priority": "P0",
+      "requirement": "MarkHere shall track dirty state by document revision, not by UI heuristics.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "packages/document-model/src/state-machine.property.test.ts",
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "apps/desktop/test/main/save-queue.test.ts"
+      ]
+    },
+    "FR-SAVE-005": {
+      "priority": "P1",
+      "requirement": "MarkHere shall preserve configured line ending (`LF` or `CRLF`) when saving.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "packages/document-model/src/state-machine.property.test.ts",
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "apps/desktop/test/main/save-queue.test.ts"
+      ]
+    },
+    "FR-SAVE-006": {
+      "priority": "P0",
+      "requirement": "MarkHere shall default new documents to UTF-8.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "packages/document-model/src/state-machine.property.test.ts",
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "apps/desktop/test/main/save-queue.test.ts"
+      ]
+    },
+    "FR-SAVE-007": {
+      "priority": "P1",
+      "requirement": "When opening a recognized non-UTF-8 encoding, MarkHere shall either preserve it safely or warn before conversion; silent mojibake is not acceptable.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "packages/document-model/src/state-machine.property.test.ts",
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "apps/desktop/test/main/save-queue.test.ts"
+      ]
+    },
+    "FR-SAVE-008": {
+      "priority": "P1",
+      "requirement": "The user shall be able to enable/disable autosave.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "packages/document-model/src/state-machine.property.test.ts",
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "apps/desktop/test/main/save-queue.test.ts"
+      ]
+    },
+    "FR-SAVE-009": {
+      "priority": "P0",
+      "requirement": "Recovery snapshots shall be independent of normal Save and shall not silently overwrite the user's document.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "packages/document-model/src/state-machine.property.test.ts",
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "apps/desktop/test/main/save-queue.test.ts"
+      ]
+    },
+    "FR-PREV-001": {
+      "priority": "P0",
+      "requirement": "Preview shall render Markdown without editing affordances.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/preview-renderer/src/sanitizer.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-PREV-002": {
+      "priority": "P0",
+      "requirement": "Preview shall support the application's selected Markdown dialect/extensions.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/preview-renderer/src/sanitizer.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-PREV-003": {
+      "priority": "P0",
+      "requirement": "Preview shall render relative local images through the approved resource layer.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/preview-renderer/src/sanitizer.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-PREV-004": {
+      "priority": "P0",
+      "requirement": "Preview shall sanitize raw HTML.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/preview-renderer/src/sanitizer.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-PREV-005": {
+      "priority": "P0",
+      "requirement": "Preview shall render Mermaid using strict/sandbox-safe settings.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/preview-renderer/src/sanitizer.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-PREV-006": {
+      "priority": "P1",
+      "requirement": "Preview shall render math.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/preview-renderer/src/sanitizer.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-PREV-007": {
+      "priority": "P1",
+      "requirement": "Heading anchors shall be deterministic and navigable.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/preview-renderer/src/sanitizer.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-PREV-008": {
+      "priority": "P0",
+      "requirement": "Clicking an external HTTPS link shall leave MarkHere only through validated external-link handling.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/preview-renderer/src/sanitizer.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-PREV-009": {
+      "priority": "P1",
+      "requirement": "Local links to other Markdown documents shall open through MarkHere's file-opening service.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/preview-renderer/src/sanitizer.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-WYS-001": {
+      "priority": "P0",
+      "requirement": "MarkHere shall provide a visual Markdown editing mode derived from MarkText/Muya capabilities.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-WYS-002": {
+      "priority": "P0",
+      "requirement": "WYSIWYG edits shall commit to the canonical document revision model.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-WYS-003": {
+      "priority": "P0",
+      "requirement": "Headings, paragraphs, emphasis, strong, strikethrough, lists, blockquotes, links, images, tables, task lists, code, and thematic breaks shall be editable where supported by editor core.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-WYS-004": {
+      "priority": "P1",
+      "requirement": "Math and diagram blocks shall provide an edit representation and rendered representation.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-WYS-005": {
+      "priority": "P0",
+      "requirement": "Undo/redo shall not cross a mode transition in a way that corrupts or reverts committed document content.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-WYS-006": {
+      "priority": "P1",
+      "requirement": "Pasting plain text shall not unexpectedly create HTML.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-WYS-007": {
+      "priority": "P1",
+      "requirement": "Pasting an image shall follow the selected image-storage policy.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-SRC-001": {
+      "priority": "P0",
+      "requirement": "MarkHere shall expose exact Markdown source editing.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-SRC-002": {
+      "priority": "P0",
+      "requirement": "Source mode shall use syntax highlighting without altering source.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-SRC-003": {
+      "priority": "P1",
+      "requirement": "Source mode shall support line numbers as a user preference.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-SRC-004": {
+      "priority": "P0",
+      "requirement": "Source mode shall support find and replace.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-SRC-005": {
+      "priority": "P1",
+      "requirement": "Source mode shall support standard editor commands and configurable keybindings.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-SRC-006": {
+      "priority": "P0",
+      "requirement": "Switching from source to visual modes shall parse the latest source revision.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-SPLIT-001": {
+      "priority": "P0",
+      "requirement": "Split mode shall show Source and Preview side by side.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-SPLIT-002": {
+      "priority": "P0",
+      "requirement": "Preview shall update from source edits using a bounded debounce.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-SPLIT-003": {
+      "priority": "P1",
+      "requirement": "Divider position shall be draggable and remembered per window preference.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-SPLIT-004": {
+      "priority": "P1",
+      "requirement": "Scroll synchronization shall be available and disable-able.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-SPLIT-005": {
+      "priority": "P1",
+      "requirement": "Scroll sync shall use structural anchors/relative mapping rather than assuming equal pixel heights.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-SPLIT-006": {
+      "priority": "P0",
+      "requirement": "Split mode shall remain usable when preview rendering fails for a single diagram; one bad block must not blank the entire source editor.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 5",
+      "tests": [
+        "packages/editor-session/src/index.test.ts",
+        "packages/preview-renderer/src/render-coordinator.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-MD-001": {
+      "priority": "P0",
+      "requirement": "Core parsing shall be measured against CommonMark 0.31.2 fixtures applicable to the chosen parser.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "packages/markdown-engine/src/index.test.ts"
+      ]
+    },
+    "FR-MD-002": {
+      "priority": "P0",
+      "requirement": "GFM tables shall render and round-trip.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "packages/markdown-engine/src/index.test.ts"
+      ]
+    },
+    "FR-MD-003": {
+      "priority": "P0",
+      "requirement": "GFM task-list items shall render and be editable.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "packages/markdown-engine/src/index.test.ts"
+      ]
+    },
+    "FR-MD-004": {
+      "priority": "P0",
+      "requirement": "GFM strikethrough shall render and edit.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "packages/markdown-engine/src/index.test.ts"
+      ]
+    },
+    "FR-MD-005": {
+      "priority": "P1",
+      "requirement": "GFM extended autolink behavior should be supported if compatible with inherited parser.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "packages/markdown-engine/src/index.test.ts"
+      ]
+    },
+    "FR-MD-006": {
+      "priority": "P0",
+      "requirement": "Fenced code blocks shall preserve language identifiers and exact code text.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "packages/markdown-engine/src/index.test.ts"
+      ]
+    },
+    "FR-MD-007": {
+      "priority": "P1",
+      "requirement": "Front matter shall be preserved exactly enough to avoid semantic data loss.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "packages/markdown-engine/src/index.test.ts"
+      ]
+    },
+    "FR-MD-008": {
+      "priority": "P0",
+      "requirement": "Unsupported extension syntax shall be preserved in source even when not visually editable.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "packages/markdown-engine/src/index.test.ts"
+      ]
+    },
+    "FR-RES-001": {
+      "priority": "P0",
+      "requirement": "Relative images shall resolve relative to the document location.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "apps/desktop/test/security/resource-capability-broker.test.ts",
+        "packages/preview-renderer/src/resource-url.test.ts"
+      ]
+    },
+    "FR-RES-002": {
+      "priority": "P0",
+      "requirement": "Workspace-relative and document-relative path rules shall be deterministic and documented.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "apps/desktop/test/security/resource-capability-broker.test.ts",
+        "packages/preview-renderer/src/resource-url.test.ts"
+      ]
+    },
+    "FR-RES-003": {
+      "priority": "P0",
+      "requirement": "Path traversal through rendered URLs shall not grant access outside approved scope.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "apps/desktop/test/security/resource-capability-broker.test.ts",
+        "packages/preview-renderer/src/resource-url.test.ts"
+      ]
+    },
+    "FR-RES-004": {
+      "priority": "P0",
+      "requirement": "Remote `http://` resources shall be blocked by default.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "apps/desktop/test/security/resource-capability-broker.test.ts",
+        "packages/preview-renderer/src/resource-url.test.ts"
+      ]
+    },
+    "FR-RES-005": {
+      "priority": "P1",
+      "requirement": "Remote `https://` images shall follow a user-controlled policy and must never gain Node/Electron privileges.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "apps/desktop/test/security/resource-capability-broker.test.ts",
+        "packages/preview-renderer/src/resource-url.test.ts"
+      ]
+    },
+    "FR-RES-006": {
+      "priority": "P0",
+      "requirement": "SVG shall be treated as active-capable content and sanitized or rasterized according to security policy.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 4",
+      "tests": [
+        "apps/desktop/test/security/resource-capability-broker.test.ts",
+        "packages/preview-renderer/src/resource-url.test.ts"
+      ]
+    },
+    "FR-WS-001": {
+      "priority": "P0",
+      "requirement": "User shall be able to open a directory as a workspace.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/workspace-path.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-WS-002": {
+      "priority": "P1",
+      "requirement": "Workspace file tree shall update when files are added/renamed/deleted externally.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/workspace-path.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-WS-003": {
+      "priority": "P1",
+      "requirement": "Workspace search shall support recursive text search with cancellation.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/workspace-path.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-WS-004": {
+      "priority": "P1",
+      "requirement": "Search must exclude configured ignored directories and binary files.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/workspace-path.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-WS-005": {
+      "priority": "P0",
+      "requirement": "Table of contents/outline shall be generated from document headings.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/workspace-path.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-WS-006": {
+      "priority": "P1",
+      "requirement": "Recent files/workspaces shall be local metadata and user-clearable.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/workspace-path.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "FR-EXP-001": {
+      "priority": "P0",
+      "requirement": "MarkHere shall export standalone HTML.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-core/src/index.test.ts",
+        "packages/export-html/src/index.test.ts",
+        "packages/export-pdf/src/index.test.ts",
+        "packages/export-docx/src/index.test.ts"
+      ]
+    },
+    "FR-EXP-002": {
+      "priority": "P0",
+      "requirement": "MarkHere shall export PDF.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-core/src/index.test.ts",
+        "packages/export-html/src/index.test.ts",
+        "packages/export-pdf/src/index.test.ts",
+        "packages/export-docx/src/index.test.ts"
+      ],
+      "manualGate": "RC-EXPORT-PDF"
+    },
+    "FR-EXP-003": {
+      "priority": "P0",
+      "requirement": "MarkHere shall export DOCX.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-core/src/index.test.ts",
+        "packages/export-html/src/index.test.ts",
+        "packages/export-pdf/src/index.test.ts",
+        "packages/export-docx/src/index.test.ts"
+      ],
+      "manualGate": "RC-EXPORT-WORD"
+    },
+    "FR-EXP-004": {
+      "priority": "P0",
+      "requirement": "Export shall snapshot a specific document revision.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-core/src/index.test.ts",
+        "packages/export-html/src/index.test.ts",
+        "packages/export-pdf/src/index.test.ts",
+        "packages/export-docx/src/index.test.ts"
+      ]
+    },
+    "FR-EXP-005": {
+      "priority": "P1",
+      "requirement": "Export shall report progress phases and completion/failure.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-core/src/index.test.ts",
+        "packages/export-html/src/index.test.ts",
+        "packages/export-pdf/src/index.test.ts",
+        "packages/export-docx/src/index.test.ts"
+      ]
+    },
+    "FR-EXP-006": {
+      "priority": "P1",
+      "requirement": "Cancellable exporters shall honor user cancellation.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-core/src/index.test.ts",
+        "packages/export-html/src/index.test.ts",
+        "packages/export-pdf/src/index.test.ts",
+        "packages/export-docx/src/index.test.ts"
+      ]
+    },
+    "FR-EXP-007": {
+      "priority": "P0",
+      "requirement": "Export failures shall not crash or freeze the main editor.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-core/src/index.test.ts",
+        "packages/export-html/src/index.test.ts",
+        "packages/export-pdf/src/index.test.ts",
+        "packages/export-docx/src/index.test.ts"
+      ]
+    },
+    "FR-EXP-008": {
+      "priority": "P0",
+      "requirement": "HTML/PDF/DOCX shall preserve headings, paragraphs, emphasis, lists, links, images, tables, code, and blockquotes at minimum.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-core/src/index.test.ts",
+        "packages/export-html/src/index.test.ts",
+        "packages/export-pdf/src/index.test.ts",
+        "packages/export-docx/src/index.test.ts"
+      ]
+    },
+    "FR-EXP-009": {
+      "priority": "P1",
+      "requirement": "Mermaid/math shall have a documented export representation.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-core/src/index.test.ts",
+        "packages/export-html/src/index.test.ts",
+        "packages/export-pdf/src/index.test.ts",
+        "packages/export-docx/src/index.test.ts"
+      ]
+    },
+    "FR-EXP-010": {
+      "priority": "P1",
+      "requirement": "MarkHere shall expose normal printing through a sanitized print representation.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-core/src/index.test.ts",
+        "packages/export-html/src/index.test.ts",
+        "packages/export-pdf/src/index.test.ts",
+        "packages/export-docx/src/index.test.ts"
+      ]
+    },
+    "FR-DOCX-001": {
+      "priority": "P0",
+      "requirement": "H1-H6 shall map to Word heading styles, not simulated bold paragraphs.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-docx/src/index.test.ts",
+        "tests/windows/manual-interoperability.md"
+      ],
+      "manualGate": "RC-EXPORT-WORD"
+    },
+    "FR-DOCX-002": {
+      "priority": "P0",
+      "requirement": "Ordered/unordered lists shall use Word numbering definitions.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-docx/src/index.test.ts",
+        "tests/windows/manual-interoperability.md"
+      ],
+      "manualGate": "RC-EXPORT-WORD"
+    },
+    "FR-DOCX-003": {
+      "priority": "P0",
+      "requirement": "Markdown tables shall become native Word tables.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-docx/src/index.test.ts",
+        "tests/windows/manual-interoperability.md"
+      ],
+      "manualGate": "RC-EXPORT-WORD"
+    },
+    "FR-DOCX-004": {
+      "priority": "P0",
+      "requirement": "Local images shall be embedded in the DOCX package.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-docx/src/index.test.ts",
+        "tests/windows/manual-interoperability.md"
+      ],
+      "manualGate": "RC-EXPORT-WORD"
+    },
+    "FR-DOCX-005": {
+      "priority": "P0",
+      "requirement": "Hyperlinks shall use proper relationships.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-docx/src/index.test.ts",
+        "tests/windows/manual-interoperability.md"
+      ],
+      "manualGate": "RC-EXPORT-WORD"
+    },
+    "FR-DOCX-006": {
+      "priority": "P0",
+      "requirement": "Code blocks shall preserve line breaks and use a code style.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-docx/src/index.test.ts",
+        "tests/windows/manual-interoperability.md"
+      ],
+      "manualGate": "RC-EXPORT-WORD"
+    },
+    "FR-DOCX-007": {
+      "priority": "P0",
+      "requirement": "Export shall not require Microsoft Word to be installed.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-docx/src/index.test.ts",
+        "tests/windows/manual-interoperability.md"
+      ]
+    },
+    "FR-DOCX-008": {
+      "priority": "P2",
+      "requirement": "Future custom/reference templates shall not be required for v1.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 7",
+      "tests": [
+        "packages/export-docx/src/index.test.ts",
+        "tests/windows/manual-interoperability.md"
+      ]
+    },
+    "FR-SET-001": {
+      "priority": "P0",
+      "requirement": "Settings shall be versioned and migration-capable.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/settings-migration.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-SET-002": {
+      "priority": "P0",
+      "requirement": "Appearance: Light, Dark, System.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/settings-migration.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-SET-003": {
+      "priority": "P0",
+      "requirement": "Default open mode shall be configurable among Preview/WYSIWYG/Source/Split.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/settings-migration.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-SET-004": {
+      "priority": "P1",
+      "requirement": "Autosave behavior shall be configurable.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/settings-migration.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-SET-005": {
+      "priority": "P0",
+      "requirement": "Remote-resource policy shall be configurable with safe default.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/settings-migration.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-SET-006": {
+      "priority": "P1",
+      "requirement": "Keybindings shall be configurable and resettable.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/settings-migration.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-SET-007": {
+      "priority": "P1",
+      "requirement": "User shall be able to reset settings without deleting user documents.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 6",
+      "tests": [
+        "apps/desktop/test/main/settings-migration.test.ts",
+        "tests/e2e/accessibility.spec.ts"
+      ]
+    },
+    "FR-REC-001": {
+      "priority": "P0",
+      "requirement": "Dirty documents shall periodically produce local recovery snapshots.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "apps/desktop/test/main/session-persistence.test.ts",
+        "tests/windows/system-acceptance.ps1"
+      ]
+    },
+    "FR-REC-002": {
+      "priority": "P0",
+      "requirement": "Recovery snapshots shall include enough identity/revision metadata to avoid applying a snapshot to the wrong file.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "apps/desktop/test/main/session-persistence.test.ts",
+        "tests/windows/system-acceptance.ps1"
+      ]
+    },
+    "FR-REC-003": {
+      "priority": "P0",
+      "requirement": "On abnormal termination, next launch shall present recoverable sessions instead of silently discarding them.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "apps/desktop/test/main/session-persistence.test.ts",
+        "tests/windows/system-acceptance.ps1"
+      ]
+    },
+    "FR-REC-004": {
+      "priority": "P1",
+      "requirement": "User can inspect, restore, save as, or discard recovered content.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "apps/desktop/test/main/session-persistence.test.ts",
+        "tests/windows/system-acceptance.ps1"
+      ]
+    },
+    "FR-REC-005": {
+      "priority": "P0",
+      "requirement": "Successful clean save/close shall eventually remove obsolete recovery state.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "apps/desktop/test/main/session-persistence.test.ts",
+        "tests/windows/system-acceptance.ps1"
+      ]
+    },
+    "FR-UPD-001": {
+      "priority": "P1",
+      "requirement": "Installed builds should support signed in-app updates.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 9",
+      "tests": [
+        "apps/desktop/src/main/services/update-service.ts",
+        "tests/windows/system-acceptance.ps1"
+      ]
+    },
+    "FR-UPD-002": {
+      "priority": "P0",
+      "requirement": "Update checks shall not upload Markdown document content.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 9",
+      "tests": [
+        "apps/desktop/src/main/services/update-service.ts",
+        "tests/windows/system-acceptance.ps1"
+      ]
+    },
+    "FR-UPD-003": {
+      "priority": "P1",
+      "requirement": "User can manually check for updates.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 9",
+      "tests": [
+        "apps/desktop/src/main/services/update-service.ts",
+        "tests/windows/system-acceptance.ps1"
+      ]
+    },
+    "FR-UPD-004": {
+      "priority": "P0",
+      "requirement": "Failed update shall not make currently installed MarkHere unusable.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 9",
+      "tests": [
+        "apps/desktop/src/main/services/update-service.ts",
+        "tests/windows/system-acceptance.ps1"
+      ],
+      "manualGate": "RC-UPDATER"
+    },
+    "NFR-SEC-001": {
+      "priority": "NFR",
+      "requirement": "Renderer shall run with `nodeIntegration: false`, `contextIsolation: true`, and `sandbox: true`.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "apps/desktop/test/security/security-policy.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "NFR-SEC-002": {
+      "priority": "NFR",
+      "requirement": "Preload shall expose capability-specific methods, never raw `ipcRenderer`.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "apps/desktop/test/security/security-policy.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "NFR-SEC-003": {
+      "priority": "NFR",
+      "requirement": "Main process shall validate IPC sender and all security-relevant inputs.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "apps/desktop/test/security/security-policy.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "NFR-SEC-004": {
+      "priority": "NFR",
+      "requirement": "App UI should use a custom secure scheme instead of an unrestricted `file://` origin.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "apps/desktop/test/security/security-policy.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "NFR-SEC-005": {
+      "priority": "NFR",
+      "requirement": "Content Security Policy shall reject arbitrary scripts/eval where dependencies permit.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "apps/desktop/test/security/security-policy.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "NFR-SEC-006": {
+      "priority": "NFR",
+      "requirement": "Raw HTML, URLs, and SVG/resource content shall be sanitized/validated.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "apps/desktop/test/security/security-policy.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "NFR-SEC-007": {
+      "priority": "NFR",
+      "requirement": "External protocol allowlist initially includes `https:` and `mailto:` only, with any additions explicitly reviewed.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "apps/desktop/test/security/security-policy.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "NFR-SEC-008": {
+      "priority": "NFR",
+      "requirement": "Production Electron fuses shall disable capabilities MarkHere does not need.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "apps/desktop/test/security/security-policy.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "NFR-SEC-009": {
+      "priority": "NFR",
+      "requirement": "Dependencies shall be scanned and reviewed before release.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "apps/desktop/test/security/security-policy.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ]
+    },
+    "NFR-SEC-010": {
+      "priority": "NFR",
+      "requirement": "Release artifacts shall be code-signed before public stable distribution.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "apps/desktop/test/security/security-policy.test.ts",
+        "tests/e2e/electron-smoke.spec.ts"
+      ],
+      "manualGate": "RC-WINDOWS-SYSTEM"
+    },
+    "NFR-REL-001": {
+      "priority": "NFR",
+      "requirement": "A failed save shall not mark a document clean.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "packages/document-model/src/state-machine.property.test.ts"
+      ]
+    },
+    "NFR-REL-002": {
+      "priority": "NFR",
+      "requirement": "A successful atomic save must result in a complete file.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "packages/document-model/src/state-machine.property.test.ts"
+      ]
+    },
+    "NFR-REL-003": {
+      "priority": "NFR",
+      "requirement": "External file changes shall never be knowingly overwritten without user policy/confirmation.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "packages/document-model/src/state-machine.property.test.ts"
+      ]
+    },
+    "NFR-REL-004": {
+      "priority": "NFR",
+      "requirement": "Export errors shall be isolated from the editing session.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "packages/document-model/src/state-machine.property.test.ts"
+      ]
+    },
+    "NFR-REL-005": {
+      "priority": "NFR",
+      "requirement": "Recovery metadata shall be schema-versioned.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "packages/document-model/src/state-machine.property.test.ts"
+      ]
+    },
+    "NFR-REL-006": {
+      "priority": "NFR",
+      "requirement": "App restart after renderer crash shall offer recovery where dirty data was persisted.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 3",
+      "tests": [
+        "apps/desktop/test/main/atomic-write.test.ts",
+        "packages/document-model/src/state-machine.property.test.ts"
+      ]
+    },
+    "NFR-PERF-001": {
+      "priority": "NFR",
+      "requirement": "Cold start target <= 2.5 s to usable editor on agreed reference PC.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 10",
+      "tests": [
+        "tests/performance/electron-performance.spec.ts"
+      ]
+    },
+    "NFR-PERF-002": {
+      "priority": "NFR",
+      "requirement": "Typical typing input-to-paint p95 < 50 ms.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 10",
+      "tests": [
+        "tests/performance/electron-performance.spec.ts"
+      ]
+    },
+    "NFR-PERF-003": {
+      "priority": "NFR",
+      "requirement": "Preview update after split edit normally within 250 ms for ordinary documents.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 10",
+      "tests": [
+        "tests/performance/electron-performance.spec.ts"
+      ]
+    },
+    "NFR-PERF-004": {
+      "priority": "NFR",
+      "requirement": "No synchronous filesystem or export operation > 50 ms on renderer interaction path.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 10",
+      "tests": [
+        "tests/performance/electron-performance.spec.ts"
+      ]
+    },
+    "NFR-PERF-005": {
+      "priority": "NFR",
+      "requirement": "Export UI remains interactive and cancellable where supported.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 10",
+      "tests": [
+        "tests/performance/electron-performance.spec.ts"
+      ]
+    },
+    "NFR-PERF-006": {
+      "priority": "NFR",
+      "requirement": "Opening large files shall show progress/usable shell rather than appear hung.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 10",
+      "tests": [
+        "tests/performance/electron-performance.spec.ts"
+      ]
+    },
+    "NFR-COMP-001": {
+      "priority": "NFR",
+      "requirement": "Windows 11 x64 is release-blocking.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 10",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "tests/e2e/compatibility.spec.ts",
+        "tests/windows/system-acceptance.ps1"
+      ],
+      "manualGate": "RC-WINDOWS-SYSTEM"
+    },
+    "NFR-COMP-002": {
+      "priority": "NFR",
+      "requirement": "Windows 11 ARM64 becomes supported only after native-dependency and installer verification.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 10",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "tests/e2e/compatibility.spec.ts",
+        "tests/windows/system-acceptance.ps1"
+      ]
+    },
+    "NFR-COMP-003": {
+      "priority": "NFR",
+      "requirement": "Markdown save output should minimize unnecessary textual normalization to remain Git-friendly.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 10",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "tests/e2e/compatibility.spec.ts",
+        "tests/windows/system-acceptance.ps1"
+      ]
+    },
+    "NFR-COMP-004": {
+      "priority": "NFR",
+      "requirement": "HTML export shall use UTF-8 and standards-based markup.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 10",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "tests/e2e/compatibility.spec.ts",
+        "tests/windows/system-acceptance.ps1"
+      ]
+    },
+    "NFR-COMP-005": {
+      "priority": "NFR",
+      "requirement": "DOCX output shall be OOXML-compatible and not rely on Word automation.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 10",
+      "tests": [
+        "packages/markdown-engine/src/conformance.test.ts",
+        "tests/e2e/compatibility.spec.ts",
+        "tests/windows/system-acceptance.ps1"
+      ]
+    },
+    "NFR-MNT-001": {
+      "priority": "NFR",
+      "requirement": "Electron-specific code shall not leak into `document-model` or editor-core packages.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 1",
+      "tests": [
+        "scripts/check-architecture.mjs",
+        "packages/ipc-contract/src/schemas.test.ts"
+      ]
+    },
+    "NFR-MNT-002": {
+      "priority": "NFR",
+      "requirement": "IPC contracts shall be defined in one typed source of truth.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 1",
+      "tests": [
+        "scripts/check-architecture.mjs",
+        "packages/ipc-contract/src/schemas.test.ts"
+      ]
+    },
+    "NFR-MNT-003": {
+      "priority": "NFR",
+      "requirement": "MarkText-derived files shall retain provenance.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 1",
+      "tests": [
+        "scripts/check-architecture.mjs",
+        "packages/ipc-contract/src/schemas.test.ts"
+      ]
+    },
+    "NFR-MNT-004": {
+      "priority": "NFR",
+      "requirement": "Each persisted schema shall carry a version and migrations.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 1",
+      "tests": [
+        "scripts/check-architecture.mjs",
+        "packages/ipc-contract/src/schemas.test.ts"
+      ]
+    },
+    "NFR-MNT-005": {
+      "priority": "NFR",
+      "requirement": "Core feature behavior shall be backed by automated tests before refactoring upstream-derived code.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 1",
+      "tests": [
+        "scripts/check-architecture.mjs",
+        "packages/ipc-contract/src/schemas.test.ts"
+      ]
+    },
+    "NFR-PRIV-001": {
+      "priority": "NFR",
+      "requirement": "No account is required for core functionality.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "packages/logging-core/src/index.test.ts",
+        "apps/desktop/src/main/diagnostics/diagnostic-service.ts"
+      ]
+    },
+    "NFR-PRIV-002": {
+      "priority": "NFR",
+      "requirement": "No document body shall be included in normal logs.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "packages/logging-core/src/index.test.ts",
+        "apps/desktop/src/main/diagnostics/diagnostic-service.ts"
+      ]
+    },
+    "NFR-PRIV-003": {
+      "priority": "NFR",
+      "requirement": "No telemetry/crash upload is enabled by default in v1.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "packages/logging-core/src/index.test.ts",
+        "apps/desktop/src/main/diagnostics/diagnostic-service.ts"
+      ]
+    },
+    "NFR-PRIV-004": {
+      "priority": "NFR",
+      "requirement": "Update checking shall reveal only normal update-request metadata required by the service.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "packages/logging-core/src/index.test.ts",
+        "apps/desktop/src/main/diagnostics/diagnostic-service.ts"
+      ]
+    },
+    "NFR-PRIV-005": {
+      "priority": "NFR",
+      "requirement": "Diagnostic export shall be user-initiated and documented.",
+      "architecture": [
+        "docs/10-testing-strategy.md"
+      ],
+      "implementationIssue": "Issue 8",
+      "tests": [
+        "packages/logging-core/src/index.test.ts",
+        "apps/desktop/src/main/diagnostics/diagnostic-service.ts"
+      ]
+    }
+  }
+}

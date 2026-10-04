@@ -28,3 +28,26 @@ describe('atomicReplaceFile', () => {
     } finally { await rm(dir, { recursive: true, force: true }) }
   })
 })
+
+describe('Issue 10 atomic-save fault injection', () => {
+  it('keeps the original when writing fails before temp creation completes', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'markhere-atomic-before-write-'))
+    try {
+      const target = join(dir, 'document.md')
+      await writeFile(target, 'durable-original')
+      await expect(atomicReplaceFile(target, Buffer.from('new'), { beforeWrite: async () => { throw Object.assign(new Error('disk full'), { code: 'ENOSPC' }) } })).rejects.toThrow('disk full')
+      expect(await readFile(target, 'utf8')).toBe('durable-original')
+    } finally { await rm(dir, { recursive: true, force: true }) }
+  })
+
+  it('keeps the original when failure occurs after complete temp write but before replace', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'markhere-atomic-after-write-'))
+    try {
+      const target = join(dir, 'document.md')
+      await writeFile(target, 'durable-original')
+      await expect(atomicReplaceFile(target, Buffer.from('new-complete'), { afterWrite: async () => { throw new Error('simulated interruption') } })).rejects.toThrow('simulated interruption')
+      expect(await readFile(target, 'utf8')).toBe('durable-original')
+      expect((await readdir(dir)).filter((name) => name.endsWith('.markhere.tmp'))).toEqual([])
+    } finally { await rm(dir, { recursive: true, force: true }) }
+  })
+})

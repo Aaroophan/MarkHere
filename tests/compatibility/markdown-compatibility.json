@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "commonMark": { "version": "0.31.2", "status": "supported", "suite": "commonmark-spec@0.31.2" },
+  "features": [
+    { "id": "gfm-tables", "status": "supported" },
+    { "id": "gfm-task-lists", "status": "supported" },
+    { "id": "gfm-strikethrough", "status": "supported" },
+    { "id": "extended-autolinks", "status": "supported" },
+    { "id": "front-matter", "status": "partially-supported", "editor": "protected/source-oriented" },
+    { "id": "math", "status": "partially-supported", "editor": "source/protected" },
+    { "id": "mermaid", "status": "partially-supported", "editor": "source/protected" },
+    { "id": "raw-html", "status": "partially-supported", "security": "sanitized" },
+    { "id": "unknown-extension-syntax", "status": "source-preserved" },
+    { "id": "mdx-execution", "status": "unsupported" }
+  ]
+}

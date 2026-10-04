@@ -52,7 +52,8 @@ import { UpdateService } from './services/update-service'
 registerPrivilegedSchemes()
 app.enableSandbox()
 app.setName(MARKHERE_PRODUCT_NAME)
-app.setPath('userData', join(app.getPath('appData'), MARKHERE_IDENTITY.userDataFolder))
+const testUserData = process.env.MARKHERE_TEST_USER_DATA?.trim()
+app.setPath('userData', testUserData && !app.isPackaged ? testUserData : join(app.getPath('appData'), MARKHERE_IDENTITY.userDataFolder))
 crashReporter.start({ productName: MARKHERE_PRODUCT_NAME, uploadToServer: false, globalExtra: { privacyMode: 'local-only' } })
 
 const lifecycle = new AppLifecycle()

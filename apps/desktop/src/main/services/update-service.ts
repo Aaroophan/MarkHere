@@ -4,7 +4,7 @@ import type { ApiResult, UpdateStatus } from '@markhere/ipc-contract'
 import { failure, ok } from './api-results'
 import type { LocalLogger } from '../logging/local-logger'
 
-function channelForVersion(version: string): 'alpha' | 'beta' | 'stable' {
+export function channelForVersion(version: string): 'alpha' | 'beta' | 'stable' {
   if (version.includes('-alpha.')) return 'alpha'
   if (version.includes('-beta.')) return 'beta'
   return 'stable'

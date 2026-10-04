@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "referencePlatform": "Windows 11 x64 reference PC",
+  "coldStartUsableMs": 2500,
+  "typingInputToPaintP95Ms": 50,
+  "ordinarySplitPreviewMs": 250,
+  "rendererSyncOperationMs": 50,
+  "largeFileClasses": { "P0": 10240, "P1": 102400, "P2": 1048576, "P3": 5242880, "P4": 20971520 }
+}

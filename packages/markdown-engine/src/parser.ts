@@ -470,3 +470,13 @@ function escapeFallback(value: string): string {
 }
 
 export { MAX_MARKDOWN_SOURCE_LENGTH }
+
+/**
+ * Reference-facing CommonMark renderer used only by the conformance suite.
+ * It intentionally excludes MarkHere/GFM extensions and custom preview
+ * renderer rules so official CommonMark 0.31.2 HTML examples can be compared
+ * byte-for-byte against the pinned parser baseline.
+ */
+export function renderCommonMarkConformance(markdown: string): string {
+  return markdownit('commonmark', { html: true }).render(markdown)
+}

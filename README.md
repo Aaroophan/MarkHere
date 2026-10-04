@@ -15,6 +15,7 @@ This repository implements:
 - **Issue 7 — Implement the Unified Export Architecture for HTML, PDF, DOCX, and Printing**
 - **Issue 8 — Implement Security Enforcement, Error Handling, Logging, Crash Recovery, Privacy, and Operational Hardening**
 - **Issue 9 — Package, Sign, Integrate, Update, and Deploy MarkHere on Windows 11**
+- **Issue 10 — Implement the Full Automated Testing, Performance, Accessibility, Compatibility, and Release-Acceptance Program**
 
 The 11 architecture documents in `docs/01-...` through `docs/11-...` are normative. `docs/12-implementation-plan,md` is the implementation backlog derived from them. When implementation and architecture disagree, resolve the architecture conflict explicitly rather than silently weakening a boundary.
 
@@ -105,6 +106,13 @@ See `docs/development/issue-08-implementation.md` and `docs/development/issue-08
 MarkHere now has a production Windows 11 x64 packaging path using electron-builder + per-user NSIS + ZIP, custom per-user Markdown handler registration, Electron fuse mutation before signing, Authenticode verification, a main-only electron-updater service, Explorer/CLI activation through normal file/workspace capability issuance, and a protected Windows release workflow. Stable release builds require CI-provided publisher/signing/update-host values and a committed frozen `pnpm-lock.yaml`; the repository does not fabricate those release credentials or dependency evidence.
 
 See `docs/development/issue-09-implementation.md` and `docs/development/issue-09-validation.md`.
+
+
+## Issue 10 release qualification
+
+Issue 10 completes MarkHere’s layered quality program: the official CommonMark 0.31.2 corpus, property/state tests, Playwright Electron E2E, axe accessibility smoke, deterministic performance/soak fixtures, exact Windows installer tests, Unicode/no-edit compatibility checks, export artifact parsing, synthetic-fixture privacy checks, machine-readable FR/NFR traceability, and candidate-hash-aware release evidence. Playwright is intentionally complemented by Windows system/manual qualification rather than treated as sole release proof.
+
+See `docs/development/issue-10-implementation.md` and `docs/development/issue-10-validation.md`.
 
 ## Pinned development baseline
 

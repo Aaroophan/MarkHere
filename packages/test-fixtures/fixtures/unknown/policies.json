@@ -1,0 +1,6 @@
+{
+  "custom-directive": "preserve-opaque",
+  "mdx-jsx": "source-only",
+  "footnote-before-support": "render-as-text",
+  "unknown-fence-language": "preserve-opaque"
+}

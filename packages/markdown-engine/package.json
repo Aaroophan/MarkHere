@@ -10,10 +10,14 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "test:conformance": "vitest run src/conformance.test.ts"
   },
   "dependencies": {
     "@markhere/shared": "workspace:*",
     "markdown-it": "15.0.2"
+  },
+  "devDependencies": {
+    "commonmark-spec": "0.31.2"
   }
 }
