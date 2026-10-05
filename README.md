@@ -46,7 +46,7 @@ Recovery snapshots and UI/session metadata are private, schema-versioned storage
 - `docs/development/issue-03-implementation.md`
 - `docs/development/issue-03-validation.md`
 
-## Issue 4 Markdown/preview model
+## Issue 4 Markdown/preview model 
 
 MarkHere now has an explicit Markdown capability profile: CommonMark 0.31.2 plus registered GFM/MarkHere extensions. Parsed trees, heading maps, HTML, preview DOM, Mermaid SVG, KaTeX output, and highlighted code remain disposable derivatives of the canonical revisioned Markdown buffer. Raw HTML is sanitized before DOM insertion, links are inert until the main-process resolver classifies them, and local images use document-bound `markhere-resource://` scopes rather than `file://`.
 
