@@ -1,8 +1,10 @@
 import { app } from 'electron'
-import { autoUpdater, type UpdateInfo } from 'electron-updater'
+import electronUpdater, { type UpdateInfo } from 'electron-updater'
 import type { ApiResult, UpdateStatus } from '@markhere/ipc-contract'
 import { failure, ok } from './api-results'
 import type { LocalLogger } from '../logging/local-logger'
+
+const { autoUpdater } = electronUpdater
 
 export function channelForVersion(version: string): 'alpha' | 'beta' | 'stable' {
   if (version.includes('-alpha.')) return 'alpha'

@@ -1,9 +1,40 @@
+import { existsSync, readdirSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolve } from 'node:path'
 import { defineConfig } from 'electron-vite'
 import vue from '@vitejs/plugin-vue'
 
 const desktopRoot = fileURLToPath(new URL('.', import.meta.url))
+
+const editorCoreRequire = createRequire(resolve(desktopRoot, '../../packages/editor-core/package.json'))
+
+function resolveMuyaStyle(): string {
+  const muyaEntry = editorCoreRequire.resolve('@muyajs/core')
+  const packageRoot = resolve(dirname(muyaEntry), '../..')
+  const libDirectory = resolve(packageRoot, 'lib')
+  const documentedPath = resolve(libDirectory, 'style.css')
+  if (existsSync(documentedPath)) return documentedPath
+
+  const cssCandidates: string[] = []
+  const visit = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const entryPath = resolve(directory, entry.name)
+      if (entry.isDirectory()) visit(entryPath)
+      else if (entry.isFile() && entry.name.toLowerCase().endsWith('.css')) cssCandidates.push(entryPath)
+    }
+  }
+  visit(libDirectory)
+
+  const preferred = cssCandidates.find((candidate) => /(?:^|[\\/])style\.css$/iu.test(candidate))
+    ?? cssCandidates.find((candidate) => /(?:^|[\\/])index\.css$/iu.test(candidate))
+  if (preferred) return preferred
+  if (cssCandidates.length === 1 && cssCandidates[0]) return cssCandidates[0]
+
+  throw new Error(`Unable to locate @muyajs/core stylesheet in ${libDirectory}. Found: ${cssCandidates.join(', ') || 'none'}`)
+}
+
+const muyaStylePath = resolveMuyaStyle()
 const internalMainPackages = [
   '@markhere/document-model',
   '@markhere/export-core',
@@ -51,6 +82,12 @@ export default defineConfig({
     }
   },
   renderer: {
+    resolve: {
+      alias: [
+        { find: '@muyajs/core/style.css', replacement: muyaStylePath },
+        { find: '@muyajs/core/lib/style.css', replacement: muyaStylePath }
+      ]
+    },
     root: resolve(desktopRoot, 'src/renderer'),
     plugins: [vue()],
     build: {
