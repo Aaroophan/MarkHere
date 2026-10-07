@@ -147,7 +147,8 @@ const electronViteConfig = await text('apps/desktop/electron.vite.config.ts')
 if (!electronViteConfig.includes('externalizeDeps: false')) violations.push('sandboxed preload dependencies must be fully bundled')
 if (!electronViteConfig.includes("format: 'cjs'")) violations.push('sandboxed preload must build as CommonJS')
 if (!electronViteConfig.includes("entryFileNames: 'index.cjs'")) violations.push('sandboxed preload output must be index.cjs')
-if (!windowManager.includes("preload/index.cjs")) violations.push('WindowManager must point at the bundled sandbox preload')
+if (!windowManager.includes("new URL('../preload/index.cjs', import.meta.url)")) violations.push('WindowManager must resolve the bundled preload from out/main to out/preload')
+if (windowManager.includes("new URL('../../preload/index.cjs', import.meta.url)")) violations.push('WindowManager preload path escapes out/ and misses out/preload')
 
 const rawIpcFiles = []
 for (const file of desktopSources) {

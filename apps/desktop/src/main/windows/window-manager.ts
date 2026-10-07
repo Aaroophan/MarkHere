@@ -30,7 +30,7 @@ export interface WindowManagerOptions {
 }
 
 function preloadPath(): string {
-  return fileURLToPath(new URL('../../preload/index.cjs', import.meta.url))
+  return fileURLToPath(new URL('../preload/index.cjs', import.meta.url))
 }
 
 function normalizeOrigin(url: string): string {
