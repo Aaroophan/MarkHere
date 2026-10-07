@@ -14,7 +14,7 @@ import {
   TableDragBar,
   TableRowColumMenu
 } from '@muyajs/core'
-import '@muyajs/core/lib/style.css'
+import '@muyajs/core/style.css'
 import type { StructuralAnchor, TextPosition, TextRange } from '@markhere/document-model'
 import { applyMarkdownCommand, type EditorCommandId } from '@markhere/editor-session'
 import {

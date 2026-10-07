@@ -11,6 +11,8 @@ const internalMainPackages = [
   '@markhere/export-pdf',
   '@markhere/export-docx',
   '@markhere/ipc-contract',
+  '@markhere/markdown-engine',
+  '@markhere/logging-core',
   '@markhere/security-core',
   '@markhere/shared'
 ]
