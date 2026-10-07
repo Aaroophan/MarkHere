@@ -43,7 +43,7 @@ Markdown text is the canonical open-session state. `DocumentSession` revisions a
 
 Recovery snapshots and UI/session metadata are private, schema-versioned storage separate from the user Markdown file. See:
 
-- `docs/development/issue-03-implementation.md`
+- `docs/development/issue-03-implementation.md` 
 - `docs/development/issue-03-validation.md`
 
 ## Issue 4 Markdown/preview model 
