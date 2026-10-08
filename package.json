@@ -61,7 +61,9 @@
     "report:compatibility": "node scripts/generate-compatibility-report.mjs",
     "check:fixture-privacy": "node scripts/verify-fixture-privacy.mjs",
     "release:inspect-package": "node scripts/inspect-package-contents.mjs",
-    "release:evidence-template": "node scripts/create-release-evidence.mjs"
+    "release:evidence-template": "node scripts/create-release-evidence.mjs",
+    "launcher:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/create-local-launcher.ps1 -ProjectRoot .",
+    "check:local-launcher": "node scripts/verify-local-windows-setup.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",
