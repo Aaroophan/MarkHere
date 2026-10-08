@@ -117,11 +117,11 @@ See `docs/development/issue-10-implementation.md` and `docs/development/issue-10
 
 ## One-click local Windows setup
 
-For normal local use on Windows 11 x64, double-click `Setup-MarkHere.cmd`. It downloads a **project-local** Node.js 22.16.0 toolchain (no Administrator rights or system PATH changes), activates pnpm 10.33.4, installs the frozen workspace, downloads the Electron 42 runtime, builds the production renderer/main/preload bundles, and generates `MarkHere.exe` in the repository root.
+For normal local use on Windows 11 x64, double-click `Setup-MarkHere.cmd`. It downloads a **project-local** Node.js 22.16.0 toolchain (no Administrator rights or system PATH changes), activates pnpm 10.33.4, installs the frozen workspace, downloads Electron 42, and then runs the real electron-builder Windows directory packaging flow. The actual application is created at `dist\win-unpacked\markhere.exe`.
 
-After the first successful setup, launch MarkHere by double-clicking `MarkHere.exe`. The launcher runs the built application with `NODE_ENV=production`; it does not start the Vite development server. Rerun `Setup-MarkHere.cmd` after source/dependency changes that require a rebuild. `Setup-MarkHere.cmd --no-launch` performs setup without starting the application afterwards.
+After setup succeeds, launch MarkHere by double-clicking the root `MarkHere.exe`. That small launcher forwards directly to `dist\win-unpacked\markhere.exe`; it does **not** execute the source tree through Electron, set `NODE_ENV`, or start the Vite development server. Rerun `Setup-MarkHere.cmd` after source/dependency changes that require a rebuild.
 
-The generated `MarkHere.exe` is a **local development launcher tied to this project folder**, not the signed distributable. Official Windows installer/portable artifacts still come from the Issue-9 electron-builder release pipeline.
+The `dist\win-unpacked` application is an unsigned local packaged build intended for development/user acceptance. Signed NSIS/ZIP release artifacts still come from the protected Issue-9 release pipeline.
 
 ## Pinned development baseline
 
