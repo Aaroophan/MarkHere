@@ -16,6 +16,8 @@ const ALLOWED_ASSET_MIME_TYPES = Object.freeze<Record<string, string>>({
   '.webp': 'image/webp',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
   '.json': 'application/json; charset=utf-8'
 })
 
