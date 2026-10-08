@@ -4,11 +4,17 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ProjectRoot = (Resolve-Path $ProjectRoot).Path
+$ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $launcherPath = Join-Path $ProjectRoot 'MarkHere.exe'
+$packagedExe = Join-Path $ProjectRoot 'dist\win-unpacked\markhere.exe'
 
-if (Test-Path $launcherPath) {
-  Remove-Item -Force $launcherPath
+if (-not (Test-Path -LiteralPath $packagedExe)) {
+  throw "Packaged MarkHere executable is missing: $packagedExe. Run Setup-MarkHere.cmd first."
+}
+
+if (Test-Path -LiteralPath $launcherPath) {
+  try { Remove-Item -LiteralPath $launcherPath -Force }
+  catch { throw 'Could not replace MarkHere.exe. Close MarkHere if it is running, then run setup again.' }
 }
 
 $source = @'
@@ -26,40 +32,29 @@ internal static class MarkHereLauncher
         try
         {
             string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            string appDir = Path.Combine(root, "apps", "desktop");
-            string mainEntry = Path.Combine(appDir, "out", "main", "index.js");
-            string electronExe = Path.Combine(appDir, "node_modules", "electron", "dist", "electron.exe");
+            string packagedExe = Path.Combine(root, "dist", "win-unpacked", "markhere.exe");
 
-            if (!File.Exists(mainEntry))
+            if (!File.Exists(packagedExe))
             {
-                Fail("MarkHere has not been built yet. Run Setup-MarkHere.cmd once, then try again.");
-                return;
-            }
-
-            if (!File.Exists(electronExe))
-            {
-                Fail("The Electron runtime is missing. Run Setup-MarkHere.cmd again.");
+                Fail("The packaged MarkHere application is missing. Run Setup-MarkHere.cmd again.");
                 return;
             }
 
             var commandLine = new StringBuilder();
-            commandLine.Append(Quote(appDir));
             foreach (string arg in args)
             {
-                commandLine.Append(' ');
+                if (commandLine.Length > 0) commandLine.Append(' ');
                 commandLine.Append(Quote(arg));
             }
 
             var startInfo = new ProcessStartInfo
             {
-                FileName = electronExe,
+                FileName = packagedExe,
                 Arguments = commandLine.ToString(),
-                WorkingDirectory = root,
+                WorkingDirectory = Path.GetDirectoryName(packagedExe),
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            startInfo.EnvironmentVariables["NODE_ENV"] = "production";
-            startInfo.EnvironmentVariables.Remove("ELECTRON_RENDERER_URL");
 
             Process.Start(startInfo);
         }
@@ -85,12 +80,7 @@ internal static class MarkHereLauncher
 
         foreach (char c in value)
         {
-            if (c == '\\')
-            {
-                backslashes++;
-                continue;
-            }
-
+            if (c == '\\') { backslashes++; continue; }
             if (c == '\"')
             {
                 result.Append('\\', backslashes * 2 + 1);
@@ -98,7 +88,6 @@ internal static class MarkHereLauncher
                 backslashes = 0;
                 continue;
             }
-
             result.Append('\\', backslashes);
             backslashes = 0;
             result.Append(c);
@@ -118,8 +107,8 @@ Add-Type `
   -OutputType WindowsApplication `
   -ReferencedAssemblies @('System.dll', 'System.Windows.Forms.dll')
 
-if (-not (Test-Path $launcherPath)) {
+if (-not (Test-Path -LiteralPath $launcherPath)) {
   throw "Launcher compilation did not create $launcherPath"
 }
 
-Write-Host "Created $launcherPath"
+Write-Host "Created $launcherPath -> $packagedExe"
