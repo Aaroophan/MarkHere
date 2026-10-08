@@ -69,6 +69,11 @@ function Write-Section([string]$Text) {
 }
 
 function New-MarkHereLauncher {
+    $packagedExe = Join-Path $ProjectRoot 'dist\win-unpacked\markhere.exe'
+    if (-not (Test-Path -LiteralPath $packagedExe)) {
+        throw "Packaged MarkHere executable is missing: $packagedExe"
+    }
+
     if (Test-Path -LiteralPath $LauncherPath) {
         try { Remove-Item -LiteralPath $LauncherPath -Force }
         catch { throw 'Could not replace MarkHere.exe. Close MarkHere if it is running, then run setup again.' }
@@ -89,40 +94,30 @@ internal static class MarkHereLauncher
         try
         {
             string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            string appDir = Path.Combine(root, "apps", "desktop");
-            string mainEntry = Path.Combine(appDir, "out", "main", "index.js");
-            string electronExe = Path.Combine(appDir, "node_modules", "electron", "dist", "electron.exe");
+            string packagedExe = Path.Combine(root, "dist", "win-unpacked", "markhere.exe");
 
-            if (!File.Exists(mainEntry))
+            if (!File.Exists(packagedExe))
             {
-                Fail("MarkHere has not been built yet. Run Setup-MarkHere.cmd once, then try again.");
-                return;
-            }
-
-            if (!File.Exists(electronExe))
-            {
-                Fail("The Electron runtime is missing. Run Setup-MarkHere.cmd again.");
+                Fail("The packaged MarkHere application is missing. Run Setup-MarkHere.cmd again.");
                 return;
             }
 
             var commandLine = new StringBuilder();
-            commandLine.Append(Quote(appDir));
             foreach (string arg in args)
             {
-                commandLine.Append(' ');
+                if (commandLine.Length > 0) commandLine.Append(' ');
                 commandLine.Append(Quote(arg));
             }
 
             var startInfo = new ProcessStartInfo
             {
-                FileName = electronExe,
+                FileName = packagedExe,
                 Arguments = commandLine.ToString(),
-                WorkingDirectory = root,
+                WorkingDirectory = Path.GetDirectoryName(packagedExe),
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            startInfo.EnvironmentVariables["NODE_ENV"] = "production";
-            startInfo.EnvironmentVariables.Remove("ELECTRON_RENDERER_URL");
+
             Process.Start(startInfo);
         }
         catch (Exception ex)
@@ -144,15 +139,9 @@ internal static class MarkHereLauncher
         var result = new StringBuilder();
         result.Append('\"');
         int backslashes = 0;
-
         foreach (char c in value)
         {
-            if (c == '\\')
-            {
-                backslashes++;
-                continue;
-            }
-
+            if (c == '\\') { backslashes++; continue; }
             if (c == '\"')
             {
                 result.Append('\\', backslashes * 2 + 1);
@@ -160,12 +149,10 @@ internal static class MarkHereLauncher
                 backslashes = 0;
                 continue;
             }
-
             result.Append('\\', backslashes);
             backslashes = 0;
             result.Append(c);
         }
-
         result.Append('\\', backslashes * 2);
         result.Append('\"');
         return result.ToString();
@@ -250,15 +237,22 @@ try {
         Invoke-NativeChecked -FilePath $Pnpm -Arguments @('--filter', '@markhere/desktop', 'exec', 'install-electron', '--no') -FailureMessage 'Electron runtime installation failed.'
         Invoke-NativeChecked -FilePath $Pnpm -Arguments @('--filter', '@markhere/desktop', 'exec', 'electron', '--version') -FailureMessage 'Electron was downloaded but cannot be executed.'
 
-        Write-Section '[5/6] Building MarkHere for local production use...'
+        Write-Section '[5/6] Building the real packaged MarkHere application...'
         if (Test-Path -LiteralPath $DesktopOut) { Remove-Item -LiteralPath $DesktopOut -Recurse -Force }
-        Invoke-NativeChecked -FilePath $Pnpm -Arguments @('--filter', '@markhere/desktop', 'build') -FailureMessage 'MarkHere build failed.'
+        $packagedRoot = Join-Path $ProjectRoot 'dist\win-unpacked'
+        if (Test-Path -LiteralPath $packagedRoot) {
+            try { Remove-Item -LiteralPath $packagedRoot -Recurse -Force }
+            catch { throw 'Could not replace dist\win-unpacked. Close MarkHere if it is running, then run setup again.' }
+        }
+        Invoke-NativeChecked -FilePath $Pnpm -Arguments @('package:win:dir') -FailureMessage 'MarkHere Windows packaging failed.'
+        $packagedExe = Join-Path $ProjectRoot 'dist\win-unpacked\markhere.exe'
+        if (-not (Test-Path -LiteralPath $packagedExe)) { throw "Packaging completed without creating $packagedExe" }
     }
     finally {
         Pop-Location
     }
 
-    Write-Section '[6/6] Creating MarkHere.exe...'
+    Write-Section '[6/6] Creating the root MarkHere.exe launcher...'
     New-MarkHereLauncher
 
     Write-Host ''
@@ -269,6 +263,7 @@ try {
     Write-Host 'From now on, double-click:'
     Write-Host "  $LauncherPath" -ForegroundColor Yellow
     Write-Host ''
+    Write-Host 'MarkHere.exe now launches the real packaged app under dist\win-unpacked.'
     Write-Host 'Rerun Setup-MarkHere.cmd after source/dependency changes that require a rebuild.'
     Write-Host ''
 
