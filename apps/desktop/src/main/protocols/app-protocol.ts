@@ -196,7 +196,7 @@ export function installAppProtocolHandlers(
         return net.fetch(fileUrl)
       }
     
-      /* 
+      /*
        * Only HTML needs response wrapping because MarkHere injects its
        * application CSP here.
        */
