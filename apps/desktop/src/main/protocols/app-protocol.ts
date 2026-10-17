@@ -136,6 +136,8 @@ export function installAppProtocolHandlers(
     }
   )
 
+  const canonicalRendererRoot = realpath(rendererRoot)
+
   protocol.handle(MARKHERE_IDENTITY.appProtocol, async (request) => {
     let parsed: URL
     try { parsed = new URL(request.url) } catch { return errorResponse(400, 'Invalid MarkHere application request.') }
@@ -160,27 +162,54 @@ export function installAppProtocolHandlers(
     }
 
     try {
-      // Re-check containment on canonical filesystem paths so a packaged
-      // symlink cannot turn a syntactically in-root request into an escape.
-      const [canonicalRoot, canonicalTarget] = await Promise.all([
-        realpath(rendererRoot),
-        realpath(resolution.filePath)
-      ])
+      // Resolve the renderer root only once. It cannot change while the
+      // application is running, especially in a packaged ASAR build.
+      const canonicalRoot = await canonicalRendererRoot
+      const canonicalTarget = await realpath(resolution.filePath)
+    
       const canonicalRelative = relative(canonicalRoot, canonicalTarget)
-      if (canonicalRelative.startsWith('..') || isAbsolute(canonicalRelative)) {
-        return errorResponse(403, 'Blocked MarkHere application resource request.')
+      if (
+        canonicalRelative.startsWith('..') ||
+        isAbsolute(canonicalRelative)
+      ) {
+        return errorResponse(
+          403,
+          'Blocked MarkHere application resource request.'
+        )
       }
-
+    
       const info = await stat(canonicalTarget)
-      if (!info.isFile()) return errorResponse(404, 'Not found.')
-
-      const response = await net.fetch(pathToFileURL(canonicalTarget).href)
+      if (!info.isFile()) {
+        return errorResponse(404, 'Not found.')
+      }
+    
+      const fileUrl = pathToFileURL(canonicalTarget).href
+    
+      /*
+       * Do not reconstruct normal asset responses.
+       *
+       * JS/CSS/font/image chunks should travel directly from Electron's
+       * file loader to Chromium. This is also the pattern used in Electron's
+       * protocol.handle documentation.
+       */
+      if (resolution.mimeType !== 'text/html; charset=utf-8') {
+        return net.fetch(fileUrl)
+      }
+    
+      /* 
+       * Only HTML needs response wrapping because MarkHere injects its
+       * application CSP here.
+       */
+      const response = await net.fetch(fileUrl)
       const headers = new Headers(response.headers)
+    
       headers.set('content-type', resolution.mimeType)
       headers.set('x-content-type-options', 'nosniff')
-      if (resolution.mimeType === 'text/html; charset=utf-8') {
-        headers.set('content-security-policy', "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' markhere-resource: data: https:; font-src 'self' markhere-resource: data:; connect-src 'self'; media-src 'self' markhere-resource:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'")
-      }
+      headers.set(
+        'content-security-policy',
+        "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' markhere-resource: data: https:; font-src 'self' markhere-resource: data:; connect-src 'self'; media-src 'self' markhere-resource:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+      )
+    
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
